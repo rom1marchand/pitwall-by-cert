@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Relative Standings</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  .widget { padding:9px 10px; min-width:240px; }
+
+  .gap-table { display:flex; flex-direction:column; gap:3px; }
+
+  .gap-row {
+    display:grid; grid-template-columns:22px 1fr 62px;
+    gap:0 6px; align-items:center;
+    padding:5px 7px; border-radius:4px;
+    background:rgba(255,255,255,0.03);
+    border-left:3px solid transparent;
+    font-variant-numeric:tabular-nums;
+    position:relative; overflow:hidden;
+  }
+  .gap-row::before {
+    content:''; position:absolute; inset:0 0 0 -3px;
+    opacity:0.06; pointer-events:none;
+  }
+
+  .gap-row.me {
+    background:rgba(200,255,0,0.1);
+    border-left-color:var(--lime);
+  }
+  .gap-row.me::before { background:var(--lime); opacity:0.08; }
+
+  .gap-row.ahead { border-left-color:rgba(255,68,68,0.5); }
+  .gap-row.behind { border-left-color:rgba(59,167,255,0.5); }
+
+  /* Position */
+  .g-pos {
+    font-size:13px; font-weight:900; text-align:center;
+    color:var(--muted2);
+  }
+  .gap-row.me .g-pos { color:var(--lime); }
+
+  /* Name + badges */
+  .g-name-col { display:flex; align-items:center; gap:4px; min-width:0; }
+  .g-name { font-size:13px; font-weight:700; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .gap-row.me .g-name { color:#fff; font-weight:900; }
+
+  .badge {
+    flex-shrink:0; font-size:7px; font-weight:900; padding:1px 3px;
+    border-radius:2px; letter-spacing:0.08em; line-height:1.3;
+    text-transform:uppercase;
+  }
+  .badge.pit  { background:var(--amber); color:#000; }
+  .badge.drs  { background:rgba(59,167,255,0.25); color:var(--blue); border:1px solid rgba(59,167,255,0.4); }
+  .badge.class{ background:rgba(255,255,255,0.1); color:var(--muted2); border:1px solid var(--border2); }
+
+  /* Gap value */
+  .g-gap { text-align:right; font-size:13px; font-weight:900; }
+  .g-gap.ahead  { color:var(--red); }
+  .g-gap.behind { color:var(--blue); }
+  .g-gap.me     { color:var(--lime); font-size:11px; }
+
+  /* Separator */
+  .g-sep { height:1px; background:linear-gradient(90deg,var(--border2),transparent); margin:1px 0; }
+
+  /* Class header */
+  .class-hdr {
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:8px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:1px;
+  }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Relative Standings</div>
+    <div class="dot" id="dot"></div>
+  </div>
+  <div class="gap-table" id="tbl"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  function fmtGap(v) {
+    if (v == null || isNaN(v)) return '—';
+    const a = Math.abs(v);
+    if (a >= 60) return (a/60).toFixed(1) + 'm';
+    return a.toFixed(3) + 's';
+  }
+
+  function makeRow(r) {
+    const div = document.createElement('div');
+    const isMe = !!r.me;
+    const isAhead = !isMe && r.gap < 0;
+    const isBehind = !isMe && r.gap > 0;
+
+    div.className = 'gap-row' + (isMe?' me':(isAhead?' ahead':(isBehind?' behind':'')));
+
+    // Position
+    const posEl = document.createElement('div');
+    posEl.className = 'g-pos';
+    posEl.textContent = r.pos != null ? r.pos : '—';
+    div.appendChild(posEl);
+
+    // Name + badges
+    const nameCol = document.createElement('div');
+    nameCol.className = 'g-name-col';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'g-name';
+    nameEl.textContent = r.name || '—';
+    nameCol.appendChild(nameEl);
+
+    if (r.in_pit) {
+      const b = document.createElement('span');
+      b.className = 'badge pit'; b.textContent='PIT'; nameCol.appendChild(b);
+    }
+    if (r.drs_open) {
+      const b = document.createElement('span');
+      b.className = 'badge drs'; b.textContent='DRS'; nameCol.appendChild(b);
+    }
+    if (r.vehicle_class) {
+      const b = document.createElement('span');
+      b.className = 'badge class'; b.textContent = r.vehicle_class.slice(0,4).toUpperCase(); nameCol.appendChild(b);
+    }
+    div.appendChild(nameCol);
+
+    // Gap
+    const gapEl = document.createElement('div');
+    gapEl.className = 'g-gap' + (isMe?' me':(isAhead?' ahead':(isBehind?' behind':'')));
+    gapEl.textContent = isMe ? '● YOU' : fmtGap(r.gap);
+    div.appendChild(gapEl);
+
+    return div;
+  }
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: (s) => {
+      const st  = s.standings || [];
+      const d   = s.driver || {};
+      const se  = s.session || {};
+      const myPos = d.position ?? se.position;
+      const tbl = $('tbl');
+      tbl.innerHTML = '';
+
+      if (!Array.isArray(st) || !st.length) {
+        // Fallback: show ahead/me/behind from driver data
+        const rows = [
+          { pos:(myPos??0)-1, name:'Ahead',  gap:-(d.gap_car_ahead??d.time_gap_car_ahead??NaN) },
+          { pos:myPos,         name:'YOU',    gap:0, me:true },
+          { pos:(myPos??0)+1, name:'Behind', gap: (d.gap_car_behind??d.time_gap_car_behind??NaN) },
+        ];
+        rows.forEach((r,i) => {
+          if(i===1){ tbl.appendChild(makeRow(r)); const sep=document.createElement('div'); sep.className='g-sep'; tbl.appendChild(sep); }
+          else { tbl.appendChild(makeRow(r)); }
+        });
+        return;
+      }
+
+      const sorted = [...st].sort((a,b) => (a.position??99)-(b.position??99));
+      const myIdx  = sorted.findIndex(c => c.position===myPos || c.is_player || c.isPlayer);
+      const anchor = myIdx >= 0 ? myIdx : 0;
+      const start  = Math.max(0, anchor - 3);
+      const end    = Math.min(sorted.length, anchor + 4);
+
+      for (let i=start; i<end; i++) {
+        const c = sorted[i];
+        const isMe = (i === anchor);
+        const row = makeRow({
+          pos: c.position,
+          name: c.name || c.driver_name || c.short_name || c.car_number || '—',
+          gap: isMe ? 0 : (i < anchor
+            ? -(c.gap_to_player ?? c.gap_ahead ?? c.time_behind_next ?? NaN)
+            :  (c.gap_to_player ?? c.gap_behind ?? c.time_behind_next ?? NaN)),
+          in_pit:  !!(c.in_pit || c.is_in_pit || c.inPits),
+          drs_open: !!(c.drs_state === 2 || c.drs_open),
+          vehicle_class: c.vehicle_class || c.vehicleClass,
+          me: isMe,
+        });
+        tbl.appendChild(row);
+
+        if (isMe && i < end-1) {
+          const sep = document.createElement('div');
+          sep.className = 'g-sep'; tbl.appendChild(sep);
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>

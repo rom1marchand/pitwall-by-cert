@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flag</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  .widget {
+    padding:0; border-left-width:0; background:transparent;
+    box-shadow:none; backdrop-filter:none;
+  }
+  body.edit .widget {
+    background:rgba(7,7,7,0.6); border-left:4px solid var(--lime);
+  }
+  .widget::after { display:none; }
+
+  .flag {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    border-radius:4px;
+    font-weight:900; letter-spacing:0.06em; text-transform:uppercase;
+    transition:opacity 0.25s;
+    opacity:0;
+    overflow:hidden;
+  }
+  .flag.on { opacity:1; }
+
+  /* Inner shadow for depth */
+  .flag::after {
+    content:''; position:absolute; inset:0;
+    box-shadow:inset 0 0 40px rgba(0,0,0,0.5);
+    pointer-events:none;
+  }
+
+  .flag-lbl { font-size:46px; line-height:1; text-shadow:0 2px 8px rgba(0,0,0,0.6); z-index:1; }
+  .flag-sub  { font-size:12px; opacity:0.9; margin-top:3px; letter-spacing:0.2em; z-index:1; }
+
+  /* Flag colors */
+  .flag.green  { background:linear-gradient(135deg,#00a832,#006d21); color:#c8ffcb; }
+  .flag.yellow { background:linear-gradient(135deg,#FFDD00,#e6a800); color:#2a1a00; animation:pulse 0.7s ease-in-out infinite; }
+  .flag.red    { background:linear-gradient(135deg,#FF2020,#b00000); color:#fff; animation:pulse 0.5s ease-in-out infinite; }
+  .flag.sc     { background:linear-gradient(135deg,#FFCC00,#cc8800); color:#2a1a00; }
+  .flag.vsc    {
+    background:linear-gradient(135deg,#FFCC00,#cc8800);
+    color:#2a1a00;
+    background-image:repeating-linear-gradient(45deg,rgba(0,0,0,0.12),rgba(0,0,0,0.12) 12px,transparent 12px,transparent 24px);
+  }
+  .flag.fcy    { background:linear-gradient(135deg,#FFDD00,#e6a800); color:#2a1a00; }
+  .flag.blue   { background:linear-gradient(135deg,#1a88ff,#0050cc); color:#fff; animation:pulse 1s ease-in-out infinite; }
+  .flag.chk    {
+    background:repeating-conic-gradient(#000 0deg 90deg,#fff 90deg 180deg) 0 0/28px 28px;
+    color:#fff; text-shadow:0 2px 8px rgba(0,0,0,1), 0 0 20px rgba(0,0,0,0.9);
+  }
+  .flag.white  { background:linear-gradient(135deg,#eee,#ccc); color:#111; }
+  .flag.meatball { background:linear-gradient(135deg,#111,#333); color:var(--amber); }
+  .flag.black  { background:linear-gradient(135deg,#0a0a0a,#222); color:var(--red); }
+
+  @keyframes pulse { 50% { filter:brightness(0.75); } }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="flag" id="flag">
+    <div class="flag-lbl" id="lbl">—</div>
+    <div class="flag-sub" id="sub"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  function parseFlag(se) {
+    const raw = (se.session_flag || se.flag || se.global_flag || se.game_phase || '').toString().toLowerCase();
+    const yf   = (se.yellow_flag || se.local_yellow || se.sector_yellow || '').toString().toLowerCase();
+    const phase = typeof se.game_phase === 'number' ? se.game_phase : -1;
+
+    if (se.checkered || raw.includes('chequered') || raw.includes('checker'))
+      return { cls:'chk',     lbl:'FINISH',  sub:'CHEQUERED' };
+    if (raw.includes('red') || phase === 7)
+      return { cls:'red',     lbl:'RED',     sub:'SESSION STOPPED' };
+    if (raw.includes('fcy') || raw.includes('full course'))
+      return { cls:'fcy',     lbl:'FCY',     sub:'FULL COURSE YELLOW' };
+    if (raw.includes('vsc') || raw.includes('virtual'))
+      return { cls:'vsc',     lbl:'VSC',     sub:'VIRTUAL SAFETY CAR' };
+    if (raw.includes('safety') || raw.includes(' sc') || raw === 'sc' || phase === 6)
+      return { cls:'sc',      lbl:'SC',      sub:'SAFETY CAR DEPLOYED' };
+    if (raw.includes('meatball') || raw.includes('black/orange'))
+      return { cls:'meatball',lbl:'◉',       sub:'MECHANICAL FLAG' };
+    if (raw.includes('black'))
+      return { cls:'black',   lbl:'■',       sub:'DISQUALIFICATION' };
+    if (raw.includes('yellow') || yf)
+      return { cls:'yellow',  lbl:'YELLOW',  sub:yf || 'CAUTION — HAZARD AHEAD' };
+    if (raw.includes('blue') || (typeof se.flag_num === 'number' && se.flag_num === 6))
+      return { cls:'blue',    lbl:'BLUE',    sub:'ALLOW FASTER CAR BY' };
+    if (raw.includes('white'))
+      return { cls:'white',   lbl:'WHITE',   sub:'FINAL LAP' };
+    if (raw.includes('green') || raw.includes('clear') || phase === 5)
+      return { cls:'green',   lbl:'GREEN',   sub:'TRACK CLEAR' };
+    return null;
+  }
+
+  Overlay.init({
+    onData: (s) => {
+      const f = parseFlag(s.session || {});
+      const el = $('flag');
+      if (!f) {
+        el.className = 'flag'; $('lbl').textContent = '—'; $('sub').textContent = '';
+        return;
+      }
+      el.className = 'flag on ' + f.cls;
+      $('lbl').textContent = f.lbl;
+      $('sub').textContent = f.sub;
+    }
+  });
+</script>
+</body>
+</html>

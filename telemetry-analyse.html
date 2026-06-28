@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telemetry Analyzer — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="telemetry-storage.js"></script>
+<script src="telemetry-vps.js"></script>
+<script src="telemetry-canvas.js"></script>
+<script src="telemetry-channels.js"></script>
+<script src="telemetry-maths.js"></script>
+<style>
+.ta-root {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto auto 1fr;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+  position: relative;    /* anchor for .ta-ann-popover */
+}
+
+/* ── TOOLBAR ── */
+.ta-toolbar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.ta-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 900; text-transform: uppercase;
+  letter-spacing: .04em; margin-right: 12px;
+}
+.ta-meta-chip {
+  padding: 3px 8px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted);
+}
+.ta-meta-chip b { color: var(--text); font-weight: 800; }
+
+.ta-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+.ta-tool-btn {
+  padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+  border-radius: 3px; color: var(--muted); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  cursor: pointer; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ta-tool-btn:hover { border-color: var(--lime); color: var(--lime); }
+.ta-tool-btn.active { border-color: var(--lime); color: var(--lime); background: rgba(200,255,0,.08); }
+.ta-tool-btn svg { width: 13px; height: 13px; }
+
+.ta-color-swatches { display: flex; gap: 3px; margin-left: 4px; }
+.ta-swatch { width: 18px; height: 18px; border-radius: 3px; cursor: pointer;
+  border: 2px solid transparent; transition: border-color .12s; }
+.ta-swatch.active { border-color: var(--text); }
+
+.ta-spacer { flex: 1; }
+
+/* ── SHEET TABS (MoTeC-style, row 2 of grid) ── */
+.ta-sheet-tabs {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px 12px 0;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.ta-sheet-tab {
+  padding: 6px 14px 5px; background: transparent; border: 1px solid transparent;
+  border-bottom: none; border-radius: 3px 3px 0 0;
+  color: var(--muted); cursor: pointer; transition: all .12s;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  white-space: nowrap; position: relative; top: 1px;
+}
+.ta-sheet-tab:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.ta-sheet-tab.active {
+  color: var(--lime); background: var(--card);
+  border-color: var(--border); border-bottom-color: var(--card);
+}
+.ta-ws-chip {
+  padding: 3px 8px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; color: var(--muted); cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  margin-right: 6px; display: inline-flex; align-items: center; gap: 4px;
+  margin-bottom: 3px;
+}
+.ta-ws-chip:hover { border-color: var(--lime); color: var(--lime); }
+.ta-sheet-spacer { flex: 1; min-width: 8px; }
+
+/* ── LAP VIEW TOGGLE (STINT / FASTEST LAP) ── */
+.ta-view-toggle {
+  display: inline-flex; border: 1px solid var(--border); border-radius: 3px;
+  overflow: hidden; margin-left: 4px;
+}
+.ta-view-toggle button {
+  padding: 3px 8px; background: transparent; border: none; color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  cursor: pointer; transition: all .12s;
+}
+.ta-view-toggle button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.ta-view-toggle button.active { background: var(--lime); color: var(--black); }
+
+/* ── ANNOTATIONS DROPDOWN (toolbar top right) ── */
+.ta-ann-btn {
+  padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+  border-radius: 3px; color: var(--muted); cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .12s;
+}
+.ta-ann-btn:hover { border-color: var(--lime); color: var(--lime); }
+.ta-ann-btn.open  { border-color: var(--lime); color: var(--lime); background: rgba(200,255,0,.08); }
+.ta-ann-btn-count {
+  background: var(--lime); color: var(--black); padding: 0 5px;
+  border-radius: 8px; font-size: 9px; font-weight: 800;
+}
+.ta-ann-popover {
+  position: absolute; top: 48px; right: 12px; z-index: 600;
+  width: 320px; max-height: 70vh;
+  background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6);
+  overflow-y: auto; padding: 10px;
+  display: none;
+}
+.ta-ann-popover.open { display: block; }
+
+/* ── SIDEBAR — split: top (laps+channels scroll) / bottom (track map) ── */
+.ta-side {
+  background: var(--card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.ta-side-top {
+  flex: 1; overflow-y: auto; padding: 10px;
+  min-height: 0;   /* allow shrink below content height in flex */
+}
+/* Track map panel — fixed height, always visible */
+.ta-trackmap-wrap {
+  flex-shrink: 0; height: 200px;
+  border-top: 1px solid var(--border);
+  position: relative; background: #0a0a0a;
+}
+.ta-trackmap-wrap canvas {
+  display: block; width: 100%; height: 100%;
+}
+.ta-trackmap-label {
+  position: absolute; top: 6px; left: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+  pointer-events: none;
+}
+.ta-sec-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted); margin: 12px 0 6px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ta-sec-label:first-child { margin-top: 0; }
+.ta-sec-link {
+  color: var(--muted); text-decoration: none; cursor: pointer;
+  font-size: 9px; letter-spacing: .1em;
+}
+.ta-sec-link:hover { color: var(--lime); }
+
+.ta-lap-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 3px; cursor: pointer;
+  transition: background .12s; font-size: 12px; font-weight: 600;
+}
+.ta-lap-item:hover { background: rgba(255,255,255,.05); }
+.ta-lap-item input[type=checkbox] { margin: 0; }
+.ta-lap-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.ta-lap-meta  { margin-left: auto; color: var(--muted); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700; }
+.ta-lap-badge {
+  display: inline-block; padding: 1px 5px; border-radius: 2px; margin-left: 4px;
+  background: rgba(200,255,0,.15); color: var(--lime);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em;
+}
+
+.ta-ch-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 3px; cursor: pointer;
+  font-size: 12px; transition: background .12s;
+}
+.ta-ch-item:hover { background: rgba(255,255,255,.05); }
+.ta-ch-item input[type=checkbox] { margin: 0; }
+
+/* ── MAIN CHART AREA ── */
+.ta-main {
+  background: var(--black);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+/* Scrollable chart container — fills available height, scrolls vertically */
+#ta-charts-scroll {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 8px 10px;
+}
+/* MoTeC-style timeline scrollbar — fixed 24px at bottom of main */
+.ta-scrollbar-track {
+  height: 24px; flex-shrink: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  cursor: ew-resize; position: relative;
+  display: none;   /* shown once data loads */
+}
+#ta-scrollbar { display: block; width: 100%; height: 100%; }
+.ta-chart-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; padding: 6px 8px 4px;
+  margin-bottom: 6px; position: relative;
+}
+.ta-chart-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+  gap: 10px;
+}
+.ta-chart-hd-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ta-chart-trace-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em;
+}
+.ta-chart-trace-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.ta-chart-vals { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ta-chart-val  { color: var(--text); font-weight: 800; white-space: nowrap; }
+.ta-canvas-wrap { position: relative; cursor: col-resize; }       /* NEW: hints that you can grab/move the cursor bar */
+.ta-canvas-wrap.editing { cursor: default; }                      /* annotation tools take over */
+.ta-canvas-wrap canvas { display: block; width: 100%; }
+.ta-canvas-wrap canvas.anno { position: absolute; inset: 0; pointer-events: none; }
+.ta-canvas-wrap.editing canvas.anno { pointer-events: auto; cursor: crosshair; }
+
+.ta-ann-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 3px; padding: 8px 10px;
+  cursor: pointer; transition: border-color .12s;
+}
+.ta-ann-item:hover { border-color: var(--lime); }
+.ta-ann-item.selected { border-color: var(--lime); background: rgba(200,255,0,.04); }
+.ta-ann-kind {
+  display: inline-block; padding: 1px 6px; border-radius: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  margin-right: 6px;
+}
+.ta-ann-text {
+  font-size: 12px; color: var(--text); margin-top: 6px;
+  white-space: pre-wrap; word-break: break-word;
+  min-height: 16px;
+}
+.ta-ann-author { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.ta-ann-empty  { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 10px; }
+.ta-ann-del {
+  float: right; background: transparent; border: none; color: var(--muted); cursor: pointer;
+  padding: 0; font-size: 14px;
+}
+.ta-ann-del:hover { color: var(--red); }
+
+/* ── LOADING / EMPTY ── */
+.ta-loading {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; color: var(--muted); min-height: 300px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* Toast */
+#toast {
+  position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:3px;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; z-index:9999;
+  transform:translateY(20px); opacity:0; transition:transform .2s, opacity .2s;
+  pointer-events:none;
+}
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.success { background:var(--lime); color:var(--black); }
+#toast.error   { background:var(--red); color:#fff; }
+
+/* Note textarea overlay */
+.ta-note-overlay {
+  position: absolute; background: var(--card); border: 1px solid var(--lime);
+  border-radius: 3px; padding: 6px; z-index: 500;
+  box-shadow: 0 4px 14px rgba(0,0,0,.45);
+}
+.ta-note-overlay textarea {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font-size: 12px; padding: 6px 8px; border-radius: 2px; min-width: 180px;
+  min-height: 60px; resize: both; font-family: 'Barlow',sans-serif;
+}
+.ta-note-overlay-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<header id="app-header"></header>
+
+<div class="ta-root" id="ta-root">
+
+  <!-- Toolbar -->
+  <div class="ta-toolbar">
+    <div class="ta-title">Analyzer</div>
+    <div class="ta-meta-chip">File <b id="ta-file">—</b></div>
+    <div class="ta-meta-chip">Track <b id="ta-track">—</b></div>
+    <div class="ta-meta-chip">Car <b id="ta-car">—</b></div>
+
+    <div class="ta-divider"></div>
+
+    <button class="ta-tool-btn active" data-tool="pan"   title="Pan / Select"  onclick="_setTool('pan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg>
+      Pan
+    </button>
+    <button class="ta-tool-btn" data-tool="underline" title="Underline" onclick="_setTool('underline')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4v7a6 6 0 0 0 12 0V4M4 20h16"/></svg>
+      Underline
+    </button>
+    <button class="ta-tool-btn" data-tool="highlight" title="Highlight" onclick="_setTool('highlight')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l-6 6v4h4l6-6M14 4l6 6-9 9H5v-6l9-9z"/></svg>
+      Highlight
+    </button>
+    <button class="ta-tool-btn" data-tool="circle" title="Circle" onclick="_setTool('circle')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+      Circle
+    </button>
+    <button class="ta-tool-btn" data-tool="draw" title="Free draw" onclick="_setTool('draw')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      Draw
+    </button>
+    <button class="ta-tool-btn" data-tool="note" title="Sticky note" onclick="_setTool('note')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Note
+    </button>
+
+    <div class="ta-color-swatches" id="ta-colors">
+      <div class="ta-swatch active" data-color="#C8FF00" style="background:#C8FF00"></div>
+      <div class="ta-swatch"        data-color="#3b8fff" style="background:#3b8fff"></div>
+      <div class="ta-swatch"        data-color="#ff8c00" style="background:#ff8c00"></div>
+      <div class="ta-swatch"        data-color="#ff3b3b" style="background:#ff3b3b"></div>
+      <div class="ta-swatch"        data-color="#a855f7" style="background:#a855f7"></div>
+      <div class="ta-swatch"        data-color="#e8e8e8" style="background:#e8e8e8"></div>
+    </div>
+
+    <div class="ta-spacer"></div>
+
+    <button class="ta-ann-btn" id="ta-ann-btn" onclick="_toggleAnnotationsPopover()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Annotations</span>
+      <span class="ta-ann-btn-count" id="ta-ann-count">0</span>
+      <span style="font-size:10px">▾</span>
+    </button>
+
+    <button class="ta-tool-btn" onclick="_navigate('telemetry-record.html')">← Library</button>
+  </div>
+
+  <!-- Sheet tabs (MoTeC-style workspace → sheets switcher) -->
+  <div class="ta-sheet-tabs" id="ta-sheet-tabs">
+    <span class="ta-ws-chip" id="ta-ws-chip" title="Workspace (Phase 6: import MoTeC)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+      <span id="ta-ws-name">Default</span>
+    </span>
+    <!-- populated by _renderSheetTabs() -->
+    <div class="ta-sheet-spacer"></div>
+  </div>
+
+  <!-- Annotations dropdown (positioned absolute in toolbar corner) -->
+  <div class="ta-ann-popover" id="ta-ann-popover">
+    <div class="ta-sec-label" style="margin-top:0">Annotations</div>
+    <div id="ta-ann-list"><div class="ta-ann-empty">No annotations yet.</div></div>
+  </div>
+
+  <!-- Sidebar — top: laps + channels ; bottom: track map -->
+  <aside class="ta-side">
+    <div class="ta-side-top">
+      <div class="ta-sec-label">
+        Laps
+        <span class="ta-view-toggle" id="ta-view-toggle">
+          <button data-view="stint"   onclick="_setLapView('stint')">Stint</button>
+          <button data-view="fastest" class="active" onclick="_setLapView('fastest')">Fastest</button>
+        </span>
+      </div>
+
+      <!-- NEW: X-axis unit toggle (Time vs Distance) — essential for comparing braking points in MoTeC-style analysis -->
+      <div class="ta-sec-label">
+        X Axis
+        <span class="ta-view-toggle" id="ta-xaxis-toggle">
+          <button data-xaxis="time"     class="active" onclick="_setXAxisMode('time')">Time (s)</button>
+          <button data-xaxis="distance"                onclick="_setXAxisMode('distance')">Distance (m)</button>
+        </span>
+      </div>
+      <div id="ta-lap-list">
+        <div style="color:var(--muted);font-size:11px">No laps loaded.</div>
+      </div>
+
+      <div class="ta-sec-label">Channels</div>
+      <div id="ta-ch-list"></div>
+    </div>
+
+    <!-- Track map — drawn from pos_x / pos_z ; red cursor synced to cursorX -->
+    <div class="ta-trackmap-wrap">
+      <span class="ta-trackmap-label">Track Map</span>
+      <canvas id="ta-trackmap"></canvas>
+    </div>
+  </aside>
+
+  <!-- Main charts -->
+  <main class="ta-main" id="ta-main">
+    <div id="ta-charts-scroll">
+      <div class="ta-loading" id="ta-loading">
+        <div class="spinner"></div>
+        <span>Loading recording…</span>
+      </div>
+      <div id="ta-charts" style="display:none"></div>
+    </div>
+    <!-- MoTeC-style timeline scrollbar (shown after data load) -->
+    <div class="ta-scrollbar-track" id="ta-scrollbar-track">
+      <canvas id="ta-scrollbar"></canvas>
+    </div>
+  </main>
+
+  <!-- Right panel removed — annotations moved to toolbar dropdown (ta-ann-popover) -->
+</div>
+
+<!-- Sticky note overlay (rendered dynamically) -->
+<div id="ta-note-overlay-host"></div>
+
+<div id="toast"></div>
+
+<script>
+injectSharedCSS()
+Auth.requireAuth()
+
+// ─── URL PARAMS ───────────────────────────────────────────────────────────
+const _params = new URLSearchParams(location.search)
+const SCOPE   = _params.get('scope')  || 'local'   // 'local' | 'vps'
+const REC_ID  = _params.get('rec_id') || ''
+const lineupId = localStorage.getItem('pw_active_lineup') || Nav.get('lineup_id') || ''
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+const TC = window.TelemetryCanvas
+
+let snapshot      = null       // { laps, track, car, ... }
+let lapsVisible   = new Set()  // lap_num of visible laps
+let fastestLap    = null       // lap object with min duration
+let lapDurations  = new Map()  // lap_num → duration in seconds
+let stints        = []         // [{ id, laps: [lap_num,...] }] — detected via fuel rise or lap gap
+let lapView       = 'fastest'  // 'stint' | 'fastest' — controls the sidebar toggle
+// NEW: X-axis mode for the charts ('time' = seconds from lap start, 'distance' = meters from lap start).
+// Distance is the MoTeC default for lap comparison as it aligns braking points across laps.
+let xAxisMode     = 'time'     // 'time' | 'distance'
+
+// ── ZOOM / PAN STATE ──────────────────────────────────────────────────────
+// xViewMin / xViewMax : current visible window in seconds (null = full domain).
+// Modified by scroll-wheel zoom and middle-click pan.
+let xViewMin  = null   // null → use full data extent
+let xViewMax  = null   // null → use full data extent
+let _panState = null   // { startX, startViewMin, startViewMax } — active middle-click pan
+let _sbDrag   = null   // { startX, startViewMin, startViewMax } — scrollbar thumb drag
+
+// ═══ WORKSPACE MODEL ═════════════════════════════════════════════════════
+// Workspace → Sheets → Graphs → Traces (MoTeC i2 Pro structure).
+//
+// Phase 1 : un workspace par défaut avec 7 sheets matchant les maquettes
+// (COMPARE / SUSP Travel / SUSP HISTO / TRACK REPORT / Front AXLE / Rear AXLE
+// / STINT). Les traces et couleurs sont piochées dans TelemetryChannels pour
+// centraliser la config.
+//
+// `groups` reste exposée comme "graphs de la sheet active" — toute la boucle
+// de rendu (_renderBase / _renderOverlay / _canvas lookup) itère dessus sans
+// avoir à connaître le concept de sheet. _activateSheet() resynchronise.
+
+const mg = window.TelemetryChannels.makeGraph
+
+function _makeDefaultWorkspace() {
+  return {
+    id:   'ws_default',
+    name: 'Default',
+    sheets: [
+      {
+        id: 'compare', name: 'COMPARE',
+        graphs: [
+          mg('speed_tb', 'Speed / Throttle / Brake',
+             ['speed_kmh', 'throttle', 'brake'], { height: 180 }),
+          mg('gear', 'Gear', ['gear'], { height: 70 }),
+        ],
+      },
+      {
+        id: 'susp_travel', name: 'SUSP Travel',
+        graphs: [
+          mg('rh_f', 'Ride Height Front', ['ride_height_f'], { height: 110 }),
+          mg('rh_r', 'Ride Height Rear',  ['ride_height_r'], { height: 110 }),
+        ],
+      },
+      {
+        id: 'susp_histo', name: 'SUSP HISTO',
+        graphs: [
+          // type 'histogram' sera implémenté phase 5 — en attendant, traces
+          // classiques pour que la sheet ait du contenu.
+          mg('histo_fr', 'Histo FR', ['sus_travel_rf'], { height: 110, type: 'histogram' }),
+          mg('histo_fl', 'Histo FL', ['sus_travel_lf'], { height: 110, type: 'histogram' }),
+          mg('histo_rr', 'Histo RR', ['sus_travel_rr'], { height: 110, type: 'histogram' }),
+          mg('histo_rl', 'Histo RL', ['sus_travel_lr'], { height: 110, type: 'histogram' }),
+        ],
+      },
+      {
+        id: 'track_report', name: 'TRACK REPORT',
+        graphs: [
+          // type 'trackmap' sera implémenté phase 4 — stub trace en attendant
+          mg('trackmap', 'Track Map', ['speed_kmh'], { height: 400, type: 'trackmap' }),
+        ],
+      },
+      {
+        id: 'front_axle', name: 'Front AXLE',
+        graphs: [
+          mg('press_f',    'Pressure F',   ['tyre_pressure_fl','tyre_pressure_fr'], { height: 110 }),
+          mg('tyretemp_f', 'Tyre Temp F',  ['tyre_temp_fl','tyre_temp_fr'],          { height: 110 }),
+          mg('braketemp_f','Brake Temp F', ['brake_temp_fl','brake_temp_fr'],        { height: 110 }),
+          mg('wear_f',     'Wear F',       ['tyre_wear_fl','tyre_wear_fr'],          { height: 90 }),
+        ],
+      },
+      {
+        id: 'rear_axle', name: 'Rear AXLE',
+        graphs: [
+          mg('press_r',    'Pressure R',   ['tyre_pressure_rl','tyre_pressure_rr'], { height: 110 }),
+          mg('tyretemp_r', 'Tyre Temp R',  ['tyre_temp_rl','tyre_temp_rr'],          { height: 110 }),
+          mg('braketemp_r','Brake Temp R', ['brake_temp_rl','brake_temp_rr'],        { height: 110 }),
+          mg('wear_r',     'Wear R',       ['tyre_wear_rl','tyre_wear_rr'],          { height: 90 }),
+        ],
+      },
+      {
+        id: 'stint', name: 'STINT',
+        graphs: [
+          mg('stint_ve',    'VE / Fuel',    ['virtual_energy','fuel_liters'],                                          { height: 120 }),
+          mg('stint_tyres', 'Tyres Temp',   ['tyre_temp_fl','tyre_temp_fr','tyre_temp_rl','tyre_temp_rr'],              { height: 130 }),
+          mg('stint_wear',  'Tyres Wear',   ['tyre_wear_fl','tyre_wear_fr','tyre_wear_rl','tyre_wear_rr'],              { height: 110 }),
+          mg('stint_lift',  'Lift',         ['lift'],                                                                    { height: 60 }),
+        ],
+      },
+    ],
+  }
+}
+
+let workspace     = _makeDefaultWorkspace()
+let activeSheetId = 'compare'
+let groups        = _activeSheet().graphs   // vue dérivée, resync via _activateSheet
+
+function _activeSheet() {
+  return workspace.sheets.find(s => s.id === activeSheetId) || workspace.sheets[0]
+}
+
+function _activateSheet(id) {
+  if (!workspace.sheets.some(s => s.id === id)) return
+  activeSheetId = id
+  groups = _activeSheet().graphs
+  xViewMin = null; xViewMax = null   // reset zoom on sheet switch
+  _renderSheetTabs()
+  _renderSidebar()
+  _buildCharts()
+  _renderAll()
+}
+
+// ─── SHEET TABS (MoTeC-style row between toolbar and main) ──────────────
+function _renderSheetTabs() {
+  const host   = document.getElementById('ta-sheet-tabs')
+  if (!host) return
+  const spacer = host.querySelector('.ta-sheet-spacer')
+  const wsName = document.getElementById('ta-ws-name')
+  if (wsName) wsName.textContent = workspace.name
+
+  // Purge existing tabs (keep chip + spacer intact)
+  host.querySelectorAll('.ta-sheet-tab').forEach(n => n.remove())
+
+  for (const s of workspace.sheets) {
+    const tab = document.createElement('button')
+    tab.className = 'ta-sheet-tab' + (s.id === activeSheetId ? ' active' : '')
+    tab.textContent = s.name
+    tab.onclick = () => _activateSheet(s.id)
+    host.insertBefore(tab, spacer)
+  }
+}
+
+let currentTool  = 'pan'
+let currentColor = '#C8FF00'
+// NEW: cursorX is now a *persistent* cursor bar (MoTeC-style). The user
+// places it by clicking the chart and can drag it; it stays visible until
+// moved. Value is expressed in the current xAxisMode's unit (s or m).
+let cursorX       = 0           // crosshair position (lap-time or lap-dist frame)
+let _cursorDrag  = false       // true while user is dragging the cursor bar
+let annotations  = []          // fetched from VPS, only when SCOPE === 'vps'
+let selectedAnn  = null        // selected annotation id
+let _pendingAnn  = null        // partial annotation being drawn
+let _rafPending  = false       // throttles hover-only renders to rAF cadence
+
+let _currentUser = null
+
+// ─── BOOT ────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await renderHeader(lineupId ? 'lineup' : 'local', 'telemetry-analyse')
+  if (typeof _checkPopoutOverlay === 'function' && _checkPopoutOverlay('telemetry-analyse')) return
+
+  try {
+    const u = await Auth.getUser()
+    _currentUser = u?.user || null
+  } catch {}
+
+  _setupColorSwatches()
+
+  if (!REC_ID) {
+    document.getElementById('ta-loading').innerHTML = '<span>No recording specified.</span>'
+    return
+  }
+
+  try {
+    if (SCOPE === 'vps') {
+      const buf = await TelemetryVPS.download(REC_ID)
+      const txt = new TextDecoder().decode(buf)
+      snapshot = JSON.parse(txt)
+      try {
+        const a = await TelemetryVPS.listAnnotations(REC_ID)
+        annotations = a.annotations || []
+      } catch (e) { console.warn('annotations fetch failed', e) }
+    } else {
+      snapshot = await TelemetryStorage.load(lineupId, REC_ID)
+      annotations = []
+    }
+  } catch (e) {
+    console.error(e)
+    document.getElementById('ta-loading').innerHTML = `<span style="color:var(--red)">Load failed: ${e.message}</span>`
+    return
+  }
+
+  // Pre-compute lap durations & pick the fastest lap as default view.
+  _computeLapMetadata()
+  _detectStints()
+  if (fastestLap) lapsVisible.add(fastestLap.lap_num)
+
+  // Résout les plages Y 'auto' / 'auto105' en valeurs concrètes une fois
+  // qu'on a le snapshot (pour les channels dont la plage dépend des données :
+  // Speed 0..max×1.05, RPM 4000..max×1.05, etc.).
+  try { window.TelemetryChannels.resolveAutoRanges(workspace, snapshot) } catch (e) { console.warn('resolveAutoRanges failed', e) }
+
+  document.getElementById('ta-file').textContent  = snapshot.meta?.name  || 'Recording'
+  document.getElementById('ta-track').textContent = snapshot.track || snapshot.meta?.track || '—'
+  document.getElementById('ta-car').textContent   = snapshot.car   || snapshot.meta?.car   || '—'
+
+  document.getElementById('ta-loading').style.display = 'none'
+  document.getElementById('ta-charts').style.display  = 'flex'
+  document.getElementById('ta-charts').style.flexDirection = 'column'
+  document.getElementById('ta-scrollbar-track').style.display = 'block'
+
+  _renderSheetTabs()
+  _renderSidebar()
+  _buildCharts()
+  _initScrollbar()
+  _renderAnnotationsList()
+  _updateAnnotationsCount()
+  _renderAll()
+
+  window.addEventListener('resize', () => { _renderAll(); _renderScrollbar() })
+})
+
+// ─── LAP METADATA ────────────────────────────────────────────────────────
+function _computeLapMetadata() {
+  const laps = snapshot.laps || []
+  for (const l of laps) {
+    if (!l.samples || l.samples.length < 2) continue
+    const dur = (l.samples[l.samples.length - 1].t - l.samples[0].t) / 1000
+    lapDurations.set(l.lap_num, dur)
+  }
+  // Fastest lap picker: exclude the very first lap (out-lap from pits) and
+  // the last lap (in-lap back to pits) — those are typically half the length
+  // of a normal lap and would otherwise "win" the fastest contest.
+  // Also require ≥ 60 s duration to filter any remaining partial / pit laps.
+  let best = null
+  let bestDur = Infinity
+  for (let i = 0; i < laps.length; i++) {
+    if (i === 0 || i === laps.length - 1) continue
+    const l = laps[i]
+    const dur = lapDurations.get(l.lap_num)
+    if (dur == null || dur < 60) continue
+    if (dur < bestDur) { bestDur = dur; best = l }
+  }
+  // Fallback: if nothing qualifies (very short recording), pick the longest
+  // lap overall — that's the best "full-ish" lap we have.
+  if (!best) {
+    let maxDur = -1
+    for (const l of laps) {
+      const dur = lapDurations.get(l.lap_num) || 0
+      if (dur > maxDur) { maxDur = dur; best = l }
+    }
+  }
+  fastestLap = best
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────
+function _renderSidebar() {
+  const lapEl = document.getElementById('ta-lap-list')
+  lapEl.innerHTML = snapshot.laps.map((l, i) => {
+    const color = TC.LAP_COLORS[snapshot.laps.length - 1 - i] || TC.COLORS.muted
+    const checked = lapsVisible.has(l.lap_num) ? 'checked' : ''
+    const dur = lapDurations.get(l.lap_num)
+    const durTxt = (dur != null) ? _fmtLapTime(dur) : '—'
+    const fastBadge = (fastestLap && l.lap_num === fastestLap.lap_num) ? '<span class="ta-lap-badge">Fast</span>' : ''
+    return `<label class="ta-lap-item">
+      <input type="checkbox" ${checked} onchange="_toggleLap(${l.lap_num}, this.checked)">
+      <div class="ta-lap-swatch" style="background:${color}"></div>
+      <span>Lap ${l.lap_num}${fastBadge}</span>
+      <span class="ta-lap-meta">${durTxt}</span>
+    </label>`
+  }).join('')
+
+  const chEl = document.getElementById('ta-ch-list')
+  chEl.innerHTML = groups.map((g, i) => `
+    <label class="ta-ch-item">
+      <input type="checkbox" ${g.visible ? 'checked' : ''} onchange="_toggleGroup(${i}, this.checked)">
+      <span>${g.label}</span>
+      <span style="margin-left:auto;color:var(--muted);font-size:10px">${g.traces.length > 1 ? g.traces.length + '×' : ''}</span>
+    </label>`).join('')
+}
+
+function _fmtLapTime(sec) {
+  if (sec == null || !isFinite(sec)) return '—'
+  const m = Math.floor(sec / 60)
+  const s = (sec - m * 60)
+  return m > 0 ? `${m}:${s.toFixed(3).padStart(6, '0')}` : `${s.toFixed(3)}s`
+}
+
+// NEW: Unit-aware X-axis formatter — switches between lap time and lap distance.
+// Used by the scrollbar ticks and anywhere we need to label an X coordinate.
+function _fmtX(v) {
+  if (v == null || !isFinite(v)) return '—'
+  if (xAxisMode === 'distance') {
+    return v >= 1000 ? (v / 1000).toFixed(2) + 'km' : Math.round(v) + 'm'
+  }
+  return _fmtLapTime(v)
+}
+
+function _toggleLap(lapNum, on) {
+  if (on) {
+    lapsVisible.add(lapNum)
+    // NEW: prewarm math-channel cache for the newly-visible lap, async,
+    // so the first render isn't blocked by compute() cascades. We do this
+    // in the background and don't await — the initial render uses whatever
+    // is already cached (or falls back to on-demand sync compute inside
+    // _lapPoints), and subsequent renders pick up the warmed cache.
+    const lap = snapshot?.laps?.find(l => l.lap_num === lapNum)
+    if (lap && window.TelemetryMaths) {
+      const mathKeys = _collectVisibleMathKeys()
+      if (mathKeys.length) {
+        window.TelemetryMaths.prewarm(mathKeys, [lap], snapshot)
+          .then(() => _renderAll())            // re-render once warm
+          .catch(err => console.warn('prewarm failed', err))
+      }
+    }
+  } else {
+    lapsVisible.delete(lapNum)
+    // NEW: purge caches for the hidden lap so a long analysis session
+    // doesn't accumulate RAM. Math cache (Float32Arrays of ~n samples)
+    // + point cache (x/y objects) are both dropped.
+    const lap = snapshot?.laps?.find(l => l.lap_num === lapNum)
+    if (lap) {
+      window.TelemetryMaths?.invalidate(lap)    // drops math + lap._cache
+    }
+  }
+  _tmCache = null   // invalidate track map cache
+  _renderAll()
+}
+
+// NEW: collects the math-channel keys currently visible on any sheet. Used
+// to drive `prewarm` so we only compute what's about to be rendered.
+function _collectVisibleMathKeys() {
+  const out = new Set()
+  for (const g of groups) {
+    if (!g.visible) continue
+    for (const tr of g.traces) {
+      if (tr.source === 'math') out.add(tr.key)
+    }
+  }
+  return Array.from(out)
+}
+
+function _toggleGroup(idx, on) {
+  groups[idx].visible = on
+  _buildCharts()
+  _renderAll()
+}
+// ─── STINT DETECTION ─────────────────────────────────────────────────────
+// Un stint = un groupe de laps consécutifs. Frontière détectée quand :
+//   (a) gap de lap_num (p.ex. lap 5 → lap 9 : pause / relancé le recorder)
+//   (b) remontée de carburant entre la fin du lap précédent et le début
+//       du lap courant ≥ REFUEL_THRESHOLD litres (arrêt aux stands)
+// On tolère les samples sans fuel_liters (dans ce cas seul le critère (a) compte).
+const _REFUEL_THRESHOLD_L = 5
+function _detectStints() {
+  stints = []
+  const laps = snapshot?.laps || []
+  if (!laps.length) return
+  let current = { id: 0, laps: [] }
+  let prevLap = null
+  let prevEndFuel = null
+  for (const l of laps) {
+    const samples = l.samples || []
+    const startFuel = samples.length ? samples[0].fuel_liters : null
+    const endFuel   = samples.length ? samples[samples.length - 1].fuel_liters : null
+    let newStint = false
+    if (prevLap) {
+      if (l.lap_num > prevLap.lap_num + 1) newStint = true
+      else if (prevEndFuel != null && startFuel != null
+               && startFuel > prevEndFuel + _REFUEL_THRESHOLD_L) newStint = true
+    }
+    if (newStint) {
+      stints.push(current)
+      current = { id: stints.length, laps: [] }
+    }
+    current.laps.push(l.lap_num)
+    prevLap = l
+    prevEndFuel = endFuel
+  }
+  if (current.laps.length) stints.push(current)
+}
+
+// Le stint "courant" = celui contenant le fastest lap (sinon le plus long).
+function _currentStintLaps() {
+  if (!stints.length) return []
+  if (fastestLap) {
+    const s = stints.find(s => s.laps.includes(fastestLap.lap_num))
+    if (s) return s.laps.slice()
+  }
+  let biggest = stints[0]
+  for (const s of stints) if (s.laps.length > biggest.laps.length) biggest = s
+  return biggest.laps.slice()
+}
+
+// NEW: ─── X-AXIS TOGGLE (TIME / DISTANCE) ───────────────────────────────
+// Swaps the axis units across ALL charts. Resets zoom (units change) and
+// purges the per-lap point cache that was keyed on the previous axis' values.
+// Lap _cache keeps both time/distance arrays when space allows — we just
+// bump the active cacheKey, so switching back is instant.
+function _setXAxisMode(mode) {
+  if (mode !== 'time' && mode !== 'distance') return
+  if (mode === xAxisMode) return
+  xAxisMode = mode
+  xViewMin = null; xViewMax = null   // reset zoom — units differ per mode
+  cursorX  = 0                        // NEW: reset cursor bar — units differ too
+  document.querySelectorAll('#ta-xaxis-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.xaxis === mode)
+  })
+  _renderAll()
+}
+
+// ─── LAP VIEW TOGGLE (STINT / FASTEST LAP) ───────────────────────────────
+function _setLapView(mode) {
+  if (mode !== 'stint' && mode !== 'fastest') return
+  lapView = mode
+  xViewMin = null; xViewMax = null   // reset zoom when lap set changes
+  _tmCache = null                    // invalidate track map cache
+  lapsVisible.clear()
+  if (mode === 'fastest') {
+    if (fastestLap) lapsVisible.add(fastestLap.lap_num)
+  } else {
+    for (const n of _currentStintLaps()) lapsVisible.add(n)
+  }
+  document.querySelectorAll('#ta-view-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === mode)
+  })
+  _renderSidebar()
+  _renderAll()
+}
+
+// ─── ANNOTATIONS POPOVER (toolbar dropdown) ──────────────────────────────
+function _toggleAnnotationsPopover(force) {
+  const el  = document.getElementById('ta-ann-popover')
+  const btn = document.getElementById('ta-ann-btn')
+  if (!el || !btn) return
+  const open = (typeof force === 'boolean') ? force : !el.classList.contains('open')
+  el.classList.toggle('open', open)
+  btn.classList.toggle('open', open)
+}
+function _updateAnnotationsCount() {
+  const el = document.getElementById('ta-ann-count')
+  if (el) el.textContent = String(annotations.length)
+}
+// Click-outside closes the popover.
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('ta-ann-popover')
+  const btn = document.getElementById('ta-ann-btn')
+  if (!pop || !pop.classList.contains('open')) return
+  if (pop.contains(e.target) || (btn && btn.contains(e.target))) return
+  _toggleAnnotationsPopover(false)
+})
+
+// ─── CHART CARDS BUILD ──────────────────────────────────────────────────
+function _buildCharts() {
+  const host = document.getElementById('ta-charts')
+  host.innerHTML = groups.filter(g => g.visible).map(g => {
+    const tags = g.traces.map(tr => `
+      <span class="ta-chart-trace-tag" style="color:${tr.color}">
+        <span class="ta-chart-trace-dot" style="background:${tr.color}"></span>${tr.label}${tr.unit ? ' · '+tr.unit : ''}
+      </span>`).join('')
+    return `
+    <div class="ta-chart-card" data-group="${g.id}">
+      <div class="ta-chart-hd">
+        <div class="ta-chart-hd-left">
+          <span>${g.label}</span>${tags}
+        </div>
+        <div class="ta-chart-vals" id="vals-${g.id}"></div>
+      </div>
+      <div class="ta-canvas-wrap" style="height:${g.height}px">
+        <canvas class="base" id="c-${g.id}"></canvas>
+        <canvas class="anno" id="a-${g.id}"></canvas>
+      </div>
+    </div>`
+  }).join('')
+
+  host.querySelectorAll('.ta-canvas-wrap').forEach(wrap => {
+    const card = wrap.parentElement
+    const gid  = card.dataset.group
+    const a    = wrap.querySelector('canvas.anno')
+    a._groupId = gid
+    wrap._groupId = gid
+
+    // ── Annotation-related listeners : anno canvas (only targetable when the
+    //    .editing class is set, i.e. a drawing tool is active).
+    a.addEventListener('mousemove',  _onMouseMove)
+    a.addEventListener('mousedown',  _onMouseDown)
+    a.addEventListener('mouseup',    _onMouseUp)
+    a.addEventListener('click',      _onClick)
+    // NEW: no mouseleave clearing — cursor bar is persistent now.
+
+    // ── Navigation listeners : wrap element (anno has pointer-events:none in
+    //    pan mode, so these must live on the wrap to always fire).
+    wrap.addEventListener('wheel',     _onWheel, { passive: false })
+    wrap.addEventListener('dblclick',  _resetZoom)
+    wrap.addEventListener('mousedown', _onWrapMouseDown)
+    wrap.addEventListener('mousemove', _onWrapMouseMove)
+    // NEW: no mouseleave clearing — cursor bar stays where the user placed it.
+    // Suppress the browser's middle-click autoscroll.
+    wrap.addEventListener('auxclick',  e => { if (e.button === 1) e.preventDefault() })
+  })
+}
+
+// ─── COORDINATE MAPPING ─────────────────────────────────────────────────
+// NEW: X axis can be LAP TIME (seconds from lap start) OR LAP DISTANCE (meters
+// from lap start). Distance-mode aligns braking / turn-in points across laps,
+// which is the MoTeC convention for comparing performance.
+
+// NEW: reads the per-sample X value in the currently-active axis mode.
+// Returns NaN if the sample lacks the required field (callers filter).
+function _sampleX(sample, firstSample) {
+  if (xAxisMode === 'distance') {
+    if (sample.lap_distance == null || firstSample.lap_distance == null) return NaN
+    return sample.lap_distance - firstSample.lap_distance
+  }
+  return (sample.t - firstSample.t) / 1000
+}
+
+// Full data extent (unchanged by zoom/pan).
+// FIX: iterates over visible laps using _sampleX so domain is in the correct
+// unit (seconds or meters) depending on xAxisMode.
+function _xDomain() {
+  let maxX = 0
+  for (const l of snapshot.laps) {
+    if (!lapsVisible.has(l.lap_num)) continue
+    if (!l.samples.length) continue
+    const first = l.samples[0]
+    const last  = l.samples[l.samples.length - 1]
+    const x = _sampleX(last, first)
+    if (!isFinite(x)) continue
+    if (x > maxX) maxX = x
+  }
+  return [0, Math.max(maxX, 1)]
+}
+
+// Current visible window — subset of domain when zoomed in.
+// All rendering uses _xRange(); _xDomain() is used by the scrollbar only.
+function _xRange() {
+  const [dMin, dMax] = _xDomain()
+  if (xViewMin == null || xViewMax == null) return [dMin, dMax]
+  return [
+    Math.max(dMin, xViewMin),
+    Math.min(dMax, xViewMax),
+  ]
+}
+
+// Reset to full domain (double-click on any chart).
+function _resetZoom() {
+  xViewMin = null
+  xViewMax = null
+  _renderAll()
+  _renderScrollbar()
+}
+
+// Per-(lap, key, xAxisMode) point cache. Keyed on the sample array reference
+// so it stays valid for the life of the snapshot. Biggest win for mousemove
+// performance — before, _lapPoints() was recomputed on every frame.
+// FIX: cache key now includes xAxisMode so both 'time' and 'distance' arrays
+// can coexist. Switching mode keeps both versions hot for instant re-render.
+function _lapPoints(lap, key) {
+  if (!lap._cache) lap._cache = {}
+  const cacheKey = xAxisMode + '::' + key
+  if (lap._cache[cacheKey]) return lap._cache[cacheKey]
+  const out = []
+  if (lap.samples && lap.samples.length) {
+    const first = lap.samples[0]
+    const def = window.TelemetryChannels?.get(key)
+    if (def && def.source === 'math' && window.TelemetryMaths) {
+      // Math channel : calcul via le moteur, aligné sur les samples.
+      const values = window.TelemetryMaths.compute(key, lap, snapshot)
+      for (let i = 0; i < lap.samples.length; i++) {
+        const v = values[i]
+        if (v == null || !isFinite(v)) continue
+        const x = _sampleX(lap.samples[i], first)   // NEW: respect xAxisMode
+        if (!isFinite(x)) continue
+        out.push({ x, y: v })
+      }
+    } else {
+      // Channel classique : lecture directe sur le sample.
+      for (const s of lap.samples) {
+        const v = s[key]
+        if (v == null) continue
+        const x = _sampleX(s, first)                // NEW: respect xAxisMode
+        if (!isFinite(x)) continue
+        out.push({ x, y: v })
+      }
+    }
+  }
+  lap._cache[cacheKey] = out
+  return out
+}
+
+function _getBox(canvas, hasYLabels) {
+  const rect = canvas.getBoundingClientRect()
+  const padLeft = hasYLabels ? 36 : 10
+  return { x: padLeft, y: 4, w: rect.width - padLeft - 6, h: rect.height - 16 }
+}
+
+function _xFromPixel(wrap, px) {
+  const baseCanvas = wrap.querySelector('canvas.base')
+  const group = groups.find(g => g.id === baseCanvas.id.slice(2))
+  const hasYLabels = group && group.traces.length === 1
+  const box = _getBox(baseCanvas, hasYLabels)
+  const [xMin, xMax] = _xRange()
+  if (px <= box.x) return xMin
+  if (px >= box.x + box.w) return xMax
+  return xMin + ((px - box.x) / box.w) * (xMax - xMin)
+}
+
+function _pixelFromX(box, xMin, xMax, val) {
+  return box.x + (val - xMin) / (xMax - xMin) * box.w
+}
+
+// ─── ZOOM / PAN INTERACTIONS ─────────────────────────────────────────────
+
+// Wheel handler : attached to .ta-canvas-wrap so it always fires (the anno
+// canvas is pointer-events:none in pan mode).
+function _onWheel(e) {
+  e.preventDefault()
+  e.stopPropagation()
+  const [dMin, dMax] = _xDomain()
+  const [vMin, vMax] = _xRange()
+  const span = vMax - vMin
+
+  // Map cursor X → time. e.currentTarget is the wrap.
+  const wrap       = e.currentTarget
+  const baseCanvas = wrap.querySelector('canvas.base')
+  const rect       = wrap.getBoundingClientRect()
+  const px         = e.clientX - rect.left
+  const group      = groups.find(g => g.id === wrap._groupId)
+  const box        = _getBox(baseCanvas, group && group.traces.length === 1)
+  const cursorT    = vMin + Math.max(0, Math.min(1, (px - box.x) / box.w)) * span
+
+  // Zoom factor — Ctrl+wheel for finer control
+  const step   = e.ctrlKey ? 1.06 : 1.22
+  const factor = e.deltaY > 0 ? step : (1 / step)
+  const minSpan = 1          // minimum 1 s visible
+  const newSpan = Math.max(minSpan, Math.min(span * factor, dMax - dMin))
+
+  // Keep cursorT fixed under the mouse
+  const ratio  = (cursorT - vMin) / span
+  let   newMin = cursorT - ratio * newSpan
+  let   newMax = newMin  + newSpan
+
+  // Clamp to domain
+  if (newMin < dMin) { newMax += dMin - newMin; newMin = dMin }
+  if (newMax > dMax) { newMin -= newMax - dMax; newMax = dMax }
+  xViewMin = Math.max(dMin, newMin)
+  xViewMax = Math.min(dMax, newMax)
+  _renderAll()
+  _renderScrollbar()
+}
+
+// Mousedown on wrap.
+//   - Middle-click  → pan the view horizontally.
+//   - Left-click in pan mode → place the cursor bar AND start dragging it
+//     (MoTeC i2 style). Release anywhere to drop. In annotation (editing)
+//     mode the anno canvas consumes left-clicks instead, so this block only
+//     fires when we're truly in pan mode.
+function _onWrapMouseDown(e) {
+  if (e.button === 1) {
+    e.preventDefault()
+    const [vMin, vMax] = _xRange()
+    _panState = { startX: e.clientX, startViewMin: vMin, startViewMax: vMax }
+    return
+  }
+  if (e.button === 0 && currentTool === 'pan') {
+    const wrap = e.currentTarget
+    const rect = wrap.getBoundingClientRect()
+    const px   = e.clientX - rect.left
+    cursorX     = _xFromPixel(wrap, px)
+    _cursorDrag = true
+    _renderHoverOnly()
+  }
+}
+
+// Mousemove on wrap — updates the cursor bar position ONLY while the user
+// is actively dragging it. Outside of a drag, moving the mouse no longer
+// alters cursorX (persistent behaviour).
+function _onWrapMouseMove(e) {
+  if (!_cursorDrag) return
+  const wrap = e.currentTarget
+  const rect = wrap.getBoundingClientRect()
+  const px   = e.clientX - rect.left
+  cursorX = _xFromPixel(wrap, px)
+  _renderHoverOnly()
+}
+
+// ── Document-level mouse handlers (pan + scrollbar drag) ─────────────────
+// These run even when the cursor leaves the chart canvas.
+document.addEventListener('mousemove', _onGlobalMouseMove)
+document.addEventListener('mouseup',   _onGlobalMouseUp)
+
+function _onGlobalMouseMove(e) {
+  // ── Cursor-bar drag ───────────────────────────────────────────────────
+  // NEW: tracks the mouse globally so the cursor bar keeps following even
+  // if the pointer leaves the chart area while the button is held down.
+  if (_cursorDrag) {
+    const firstWrap = document.querySelector('#ta-charts .ta-canvas-wrap')
+    if (!firstWrap) return
+    const rect = firstWrap.getBoundingClientRect()
+    const px   = e.clientX - rect.left
+    cursorX = _xFromPixel(firstWrap, px)
+    _renderHoverOnly()
+    return
+  }
+
+  // ── Middle-click pan ──────────────────────────────────────────────────
+  if (_panState) {
+    const [dMin, dMax] = _xDomain()
+    const span = _panState.startViewMax - _panState.startViewMin
+
+    // Compute px-per-second from the first visible chart canvas
+    const firstWrap = document.querySelector('#ta-charts .ta-canvas-wrap')
+    if (!firstWrap) return
+    const bc    = firstWrap.querySelector('canvas.base')
+    const gObj  = groups.find(g => g.id === bc.id.slice(2))
+    const box   = _getBox(bc, gObj && gObj.traces.length === 1)
+    if (box.w <= 0) return
+    const secPerPx = span / box.w
+
+    const dx    = e.clientX - _panState.startX
+    let newMin  = _panState.startViewMin - dx * secPerPx
+    let newMax  = _panState.startViewMax - dx * secPerPx
+    if (newMin < dMin) { newMax += dMin - newMin; newMin = dMin }
+    if (newMax > dMax) { newMin -= newMax - dMax; newMax = dMax }
+    xViewMin = Math.max(dMin, newMin)
+    xViewMax = Math.min(dMax, newMax)
+    _renderAll()
+    _renderScrollbar()
+    return
+  }
+
+  // ── Scrollbar thumb drag ──────────────────────────────────────────────
+  if (_sbDrag) {
+    const [dMin, dMax] = _xDomain()
+    const domain = dMax - dMin
+    const canvas = document.getElementById('ta-scrollbar'); if (!canvas) return
+    const rect   = canvas.getBoundingClientRect(); if (rect.width === 0) return
+
+    const dxPx  = e.clientX - _sbDrag.startX
+    const dxT   = (dxPx / rect.width) * domain
+    let newMin  = _sbDrag.startViewMin + dxT
+    let newMax  = _sbDrag.startViewMax + dxT
+    if (newMin < dMin) { newMax += dMin - newMin; newMin = dMin }
+    if (newMax > dMax) { newMin -= newMax - dMax; newMax = dMax }
+    xViewMin = Math.max(dMin, newMin)
+    xViewMax = Math.min(dMax, newMax)
+    _renderAll()
+    _renderScrollbar()
+  }
+}
+
+function _onGlobalMouseUp() {
+  _panState   = null
+  _sbDrag     = null
+  _cursorDrag = false                              // NEW: end cursor-bar drag
+}
+
+// ─── TIMELINE SCROLLBAR ───────────────────────────────────────────────────
+function _initScrollbar() {
+  const canvas = document.getElementById('ta-scrollbar'); if (!canvas) return
+  canvas.addEventListener('mousedown', e => {
+    e.preventDefault()
+    const [dMin, dMax] = _xDomain()
+    const [vMin, vMax] = _xRange()
+    const domain = dMax - dMin
+    const rect   = canvas.getBoundingClientRect()
+    if (rect.width === 0) return
+
+    const clickT  = dMin + ((e.clientX - rect.left) / rect.width) * domain
+    const thumbLo = dMin + ((vMin - dMin) / domain) * domain
+    const thumbHi = dMin + ((vMax - dMin) / domain) * domain
+
+    // Click inside thumb → drag; outside → jump-center
+    if (clickT >= vMin && clickT <= vMax) {
+      _sbDrag = { startX: e.clientX, startViewMin: vMin, startViewMax: vMax }
+    } else {
+      const span   = vMax - vMin
+      let newMin   = clickT - span / 2
+      let newMax   = clickT + span / 2
+      if (newMin < dMin) { newMax += dMin - newMin; newMin = dMin }
+      if (newMax > dMax) { newMin -= newMax - dMax; newMax = dMax }
+      xViewMin = Math.max(dMin, newMin)
+      xViewMax = Math.min(dMax, newMax)
+      _sbDrag  = { startX: e.clientX, startViewMin: xViewMin, startViewMax: xViewMax }
+      _renderAll()
+      _renderScrollbar()
+    }
+  })
+}
+
+function _renderScrollbar() {
+  const canvas = document.getElementById('ta-scrollbar'); if (!canvas || !snapshot) return
+  const [dMin, dMax] = _xDomain()
+  const [vMin, vMax] = _xRange()
+  const domain = dMax - dMin; if (domain <= 0) return
+
+  const dpr  = window.devicePixelRatio || 1
+  const rect = canvas.getBoundingClientRect()
+  const W    = rect.width, H = rect.height
+  if (W === 0) return
+  if (canvas.width  !== Math.round(W * dpr) ||
+      canvas.height !== Math.round(H * dpr)) {
+    canvas.width  = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+  }
+  const ctx = canvas.getContext('2d')
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, W, H)
+
+  // Background
+  ctx.fillStyle = '#0e0e0e'
+  ctx.fillRect(0, 0, W, H)
+
+  // Time ticks
+  ctx.fillStyle = 'rgba(255,255,255,.12)'
+  const tickInt = _niceTickInterval(domain, Math.max(4, Math.floor(W / 50)))
+  for (let t = Math.ceil(dMin / tickInt) * tickInt; t <= dMax; t += tickInt) {
+    const tx = ((t - dMin) / domain) * W
+    ctx.fillRect(Math.round(tx), H - 4, 1, 3)
+    // Small label — FIX: use unit-aware formatter so scrollbar shows m/km in distance mode.
+    ctx.fillStyle = 'rgba(255,255,255,.25)'
+    ctx.font = '8px "Barlow Condensed",sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(_fmtX(t), Math.round(tx), H - 6)
+    ctx.fillStyle = 'rgba(255,255,255,.12)'
+  }
+
+  // Thumb
+  const thumbX = ((vMin - dMin) / domain) * W
+  const thumbW = Math.max(4, ((vMax - vMin) / domain) * W)
+  ctx.fillStyle   = 'rgba(200,255,0,.12)'
+  ctx.fillRect(thumbX, 0, thumbW, H)
+  ctx.strokeStyle = 'rgba(200,255,0,.55)'
+  ctx.lineWidth   = 1
+  ctx.strokeRect(thumbX + .5, .5, thumbW - 1, H - 1)
+
+  // Cursor line
+  if (cursorX != null) {
+    const cx = ((cursorX - dMin) / domain) * W
+    ctx.strokeStyle = 'rgba(200,255,0,.7)'
+    ctx.lineWidth   = 1
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke()
+  }
+}
+
+// ─── TRACK MAP ────────────────────────────────────────────────────────────
+// Drawn from pos_x / pos_z samples of each visible lap.
+// A red dot (primary lap) + white dots (other laps) move with cursorX.
+//
+// _renderTrackMap()       → full redraw (track paths + cursor)
+// _renderTrackMapCursor() → cursor-only fast path (called from _renderHoverOnly)
+
+let _tmCache = null   // { laps: [{lapNum, color, pts:[{x,z}]}], box }
+
+function _buildTrackMapCache() {
+  if (!snapshot) { _tmCache = null; return }
+  const visibleLaps = snapshot.laps.filter(l => lapsVisible.has(l.lap_num))
+  const lapsData = []
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+
+  for (const l of visibleLaps) {
+    const pts = []
+    for (const s of (l.samples || [])) {
+      if (s.pos_x == null || s.pos_z == null) continue
+      pts.push({ x: s.pos_x, z: s.pos_z, t: (s.t - l.samples[0].t) / 1000 })
+      if (s.pos_x < minX) minX = s.pos_x
+      if (s.pos_x > maxX) maxX = s.pos_x
+      if (s.pos_z < minZ) minZ = s.pos_z
+      if (s.pos_z > maxZ) maxZ = s.pos_z
+    }
+    const idx   = snapshot.laps.indexOf(l)
+    const color = TC.LAP_COLORS[snapshot.laps.length - 1 - idx] || TC.COLORS.muted
+    lapsData.push({ lapNum: l.lap_num, color, pts })
+  }
+
+  if (lapsData.every(d => d.pts.length === 0)) { _tmCache = null; return }
+
+  // Add 5 % margin
+  const padX = (maxX - minX) * 0.05 || 10
+  const padZ = (maxZ - minZ) * 0.05 || 10
+  _tmCache = {
+    laps: lapsData,
+    box: { minX: minX - padX, maxX: maxX + padX, minZ: minZ - padZ, maxZ: maxZ + padZ },
+  }
+}
+
+// Map world (x, z) → canvas pixel, preserving aspect ratio.
+function _tmToCanvas(wx, wz, W, H, box) {
+  const scaleX = W / (box.maxX - box.minX)
+  const scaleZ = H / (box.maxZ - box.minZ)
+  const scale  = Math.min(scaleX, scaleZ)
+  const offX   = (W - (box.maxX - box.minX) * scale) / 2
+  const offZ   = (H - (box.maxZ - box.minZ) * scale) / 2
+  return {
+    px: offX + (wx - box.minX) * scale,
+    py: H - offZ - (wz - box.minZ) * scale,   // Z grows "forward" → invert Y
+  }
+}
+
+function _renderTrackMap() {
+  const canvas = document.getElementById('ta-trackmap'); if (!canvas) return
+  _buildTrackMapCache()
+
+  const dpr  = window.devicePixelRatio || 1
+  const rect = canvas.getBoundingClientRect()
+  const W = rect.width, H = rect.height
+  if (W === 0 || H === 0) return
+
+  if (canvas.width  !== Math.round(W * dpr) ||
+      canvas.height !== Math.round(H * dpr)) {
+    canvas.width  = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+  }
+  const ctx = canvas.getContext('2d')
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, W, H)
+
+  if (!_tmCache) {
+    // No positional data — show placeholder
+    ctx.fillStyle = 'rgba(255,255,255,.07)'
+    ctx.font = 'bold 10px "Barlow Condensed",sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('No GPS data', W / 2, H / 2)
+    return
+  }
+
+  const { laps, box } = _tmCache
+  const primaryLapNum = _primaryLapNum(snapshot.laps.filter(l => lapsVisible.has(l.lap_num)))
+
+  // Draw track paths
+  for (const d of laps) {
+    if (!d.pts.length) continue
+    const isPrimary = d.lapNum === primaryLapNum
+    ctx.beginPath()
+    let first = true
+    for (const p of d.pts) {
+      const { px, py } = _tmToCanvas(p.x, p.z, W, H, box)
+      if (first) { ctx.moveTo(px, py); first = false } else ctx.lineTo(px, py)
+    }
+    ctx.strokeStyle = isPrimary ? d.color : _fade(d.color, 0.35)
+    ctx.lineWidth   = isPrimary ? 1.8 : 1.0
+    ctx.lineJoin    = 'round'
+    ctx.stroke()
+  }
+
+  // Draw cursor dots
+  _drawTrackMapCursor(ctx, W, H, box, primaryLapNum)
+}
+
+// Fast path — only redraws the cursor.  Caller manages canvas sizing.
+function _renderTrackMapCursor() {
+  const canvas = document.getElementById('ta-trackmap'); if (!canvas) return
+  if (!_tmCache) return
+
+  const dpr  = window.devicePixelRatio || 1
+  const rect = canvas.getBoundingClientRect()
+  const W = rect.width, H = rect.height
+  if (W === 0 || H === 0) return
+
+  // Full redraw is cheapest on a small canvas — just delegate.
+  _renderTrackMap()
+}
+
+function _drawTrackMapCursor(ctx, W, H, box, primaryLapNum) {
+  if (cursorX == null || !_tmCache) return
+  const { laps } = _tmCache
+
+  for (const d of laps) {
+    if (!d.pts.length) continue
+    // Binary-search closest point by time
+    let lo = 0, hi = d.pts.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (d.pts[mid].t < cursorX) lo = mid + 1; else hi = mid
+    }
+    const p = d.pts[lo]
+    if (!p) continue
+
+    const { px, py } = _tmToCanvas(p.x, p.z, W, H, box)
+    const isPrimary  = d.lapNum === primaryLapNum
+    const r          = isPrimary ? 5 : 3.5
+
+    ctx.beginPath()
+    ctx.arc(px, py, r, 0, Math.PI * 2)
+    ctx.fillStyle   = isPrimary ? '#ff2222' : 'rgba(255,80,80,.65)'
+    ctx.fill()
+    ctx.strokeStyle = isPrimary ? '#fff' : 'rgba(255,255,255,.5)'
+    ctx.lineWidth   = isPrimary ? 1.5 : 1
+    ctx.stroke()
+  }
+}
+
+function _niceTickInterval(range, maxTicks) {
+  const raw  = range / Math.max(1, maxTicks)
+  const mag  = Math.pow(10, Math.floor(Math.log10(raw)))
+  const norm = raw / mag
+  if (norm < 1.5) return mag
+  if (norm < 3.5) return 2 * mag
+  if (norm < 7.5) return 5 * mag
+  return 10 * mag
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────
+// Full render: rebuilds base + overlay for every visible group.
+// Called on init, resize, lap toggle, channel toggle, tool change.
+function _renderAll() {
+  if (!snapshot) return
+  const [xMin, xMax] = _xRange()
+  for (const g of groups) {
+    if (!g.visible) continue
+    _renderBase(g, xMin, xMax)
+    _renderOverlay(g, xMin, xMax)
+    _renderValuesAtHover(g, xMin, xMax)
+  }
+  _renderScrollbar()
+  _renderTrackMap()
+}
+
+// Cheap render: overlay + header values only.
+// Called on mousemove & while drawing annotations. rAF-throttled.
+function _renderHoverOnly() {
+  if (!snapshot) return
+  if (_rafPending) return
+  _rafPending = true
+  requestAnimationFrame(() => {
+    _rafPending = false
+    if (!snapshot) return
+    const [xMin, xMax] = _xRange()
+    for (const g of groups) {
+      if (!g.visible) continue
+      _renderOverlay(g, xMin, xMax)
+      _renderValuesAtHover(g, xMin, xMax)
+    }
+    _renderScrollbar()
+    _renderTrackMapCursor()
+  })
+}
+
+function _renderBase(g, xMin, xMax) {
+  const canvas = document.getElementById('c-' + g.id); if (!canvas) return
+  const { ctx, w, h } = TC.fitCanvas(canvas)
+  TC.clear(ctx, w, h)
+
+  const multi = g.traces.length > 1
+  const hasYLabels = !multi
+  const padLeft = hasYLabels ? 36 : 10
+  const box = { x: padLeft, y: 4, w: w - padLeft - 6, h: h - 16 }
+
+  // Grid: use first trace's Y range for label reference when single; otherwise
+  // suppress Y labels (each trace has its own scale, values shown in header).
+  TC.drawGrid(ctx, box, {
+    xMin, xMax,
+    yMin: g.traces[0].yMin, yMax: g.traces[0].yMax,
+    yTicks: 4, xTicks: 8,
+    yLabels: hasYLabels,
+    fmtY: g.traces[0].fmtY,
+  })
+
+  // Draw each (trace × lap) combination. The first trace in the group is
+  // the "primary" display channel (e.g. Speed in the Speed/Throttle/Brake
+  // group) — iterate traces in REVERSE so the primary is rendered LAST,
+  // i.e. visually on top. Same for laps: draw non-primary laps first.
+  const visibleLaps = snapshot.laps.filter(l => lapsVisible.has(l.lap_num))
+  const primaryLapNum = _primaryLapNum(visibleLaps)
+
+  for (let ti = g.traces.length - 1; ti >= 0; ti--) {
+    const tr = g.traces[ti]
+    const isPrimaryTrace = (ti === 0)
+    // Sort laps so primary lap comes last
+    const orderedLaps = visibleLaps.slice().sort((a, b) => {
+      const ap = (a.lap_num === primaryLapNum) ? 1 : 0
+      const bp = (b.lap_num === primaryLapNum) ? 1 : 0
+      return ap - bp
+    })
+    for (const lap of orderedLaps) {
+      const isPrimaryLap = lap.lap_num === primaryLapNum
+      const pts = _lapPoints(lap, tr.key)
+      if (!pts.length) continue
+
+      let color = tr.color
+      // Single-trace groups: vary color per lap (classic MoTeC overlay style).
+      if (!multi) {
+        const idx = snapshot.laps.indexOf(lap)
+        color = TC.LAP_COLORS[snapshot.laps.length - 1 - idx] || TC.COLORS.muted
+      } else if (!isPrimaryLap) {
+        // Multi-trace: keep channel color but fade non-primary laps.
+        color = _fade(tr.color, 0.32)
+      }
+
+      // Multi-trace groups: emphasize the primary trace (drawn last so on top).
+      let lineWidth
+      if (!multi) {
+        lineWidth = isPrimaryLap ? 1.6 : 1.0
+      } else {
+        const base = isPrimaryTrace ? 1.9 : 1.2
+        lineWidth = isPrimaryLap ? base : base - 0.4
+      }
+
+      TC.drawTrace(ctx, box, pts, {
+        xMin, xMax, yMin: tr.yMin, yMax: tr.yMax,
+        color,
+        lineWidth,
+        stepped: tr.stepped,
+      })
+    }
+  }
+}
+
+function _primaryLapNum(visibleLaps) {
+  // Primary = fastest lap if it's visible, else first visible, else null.
+  if (fastestLap && visibleLaps.some(l => l.lap_num === fastestLap.lap_num)) {
+    return fastestLap.lap_num
+  }
+  return visibleLaps.length ? visibleLaps[0].lap_num : null
+}
+
+function _fade(hex, alpha) {
+  // Convert '#RRGGBB' to 'rgba(r,g,b,a)'.
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const r = parseInt(m[1].slice(0, 2), 16)
+  const gC = parseInt(m[1].slice(2, 4), 16)
+  const b = parseInt(m[1].slice(4, 6), 16)
+  return `rgba(${r},${gC},${b},${alpha})`
+}
+
+function _renderOverlay(g, xMin, xMax) {
+  const canvas = document.getElementById('a-' + g.id); if (!canvas) return
+  const { ctx, w, h } = TC.fitCanvas(canvas)
+  TC.clear(ctx, w, h, 'rgba(0,0,0,0)')
+
+  const multi = g.traces.length > 1
+  const hasYLabels = !multi
+  const padLeft = hasYLabels ? 36 : 10
+  const box = { x: padLeft, y: 4, w: w - padLeft - 6, h: h - 16 }
+
+  // Existing annotations pinned to this group (match by group id OR any trace
+  // key in the group — back-compat with older annotations saved per-channel).
+  const groupKeys = new Set([g.id, ...g.traces.map(t => t.key)])
+  for (const a of annotations) {
+    if (a.channel && !groupKeys.has(a.channel)) continue
+    _drawAnnotation(ctx, box, a, xMin, xMax)
+  }
+  if (_pendingAnn && groupKeys.has(_pendingAnn.channel)) {
+    _drawAnnotation(ctx, box, _pendingAnn, xMin, xMax)
+  }
+
+  // NEW: persistent cursor bar (solid yellow, 1.5 px). Drawn only when
+  // cursorX is inside the current view.
+  if (cursorX != null && cursorX >= xMin && cursorX <= xMax) {
+    const px = _pixelFromX(box, xMin, xMax, cursorX)
+    TC.drawCrosshair(ctx, box, px, { color: 'rgba(255,221,0,.9)', width: 1.5 })
+  }
+}
+
+function _drawAnnotation(ctx, box, a, xMin, xMax) {
+  const color = a.color || '#C8FF00'
+  const selected = (selectedAnn && selectedAnn === a.id)
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.fillStyle   = color
+  ctx.lineWidth   = selected ? 2.6 : 1.8
+
+  const px1 = (a.t_start != null) ? _pixelFromX(box, xMin, xMax, a.t_start) : null
+  const px2 = (a.t_end   != null) ? _pixelFromX(box, xMin, xMax, a.t_end)   : null
+
+  if (a.kind === 'underline' && px1 != null && px2 != null) {
+    const y = box.y + box.h - 2
+    ctx.beginPath()
+    ctx.moveTo(px1, y); ctx.lineTo(px2, y); ctx.stroke()
+  }
+  else if (a.kind === 'highlight' && px1 != null && px2 != null) {
+    ctx.globalAlpha = 0.18
+    ctx.fillRect(px1, box.y, px2 - px1, box.h)
+    ctx.globalAlpha = 1
+    ctx.strokeRect(px1 + 0.5, box.y + 0.5, px2 - px1, box.h - 1)
+  }
+  else if (a.kind === 'circle' && px1 != null && px2 != null) {
+    const cx = (px1 + px2) / 2
+    const cy = box.y + box.h / 2
+    const rx = Math.abs(px2 - px1) / 2
+    const ry = box.h / 2 - 2
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  else if (a.kind === 'draw' && a.path_data) {
+    const pts = _decodePath(a.path_data)
+    if (pts.length >= 2) {
+      ctx.beginPath()
+      pts.forEach((p, i) => {
+        const px = _pixelFromX(box, xMin, xMax, p.x)
+        const py = box.y + box.h - (p.y * box.h)
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+      })
+      ctx.stroke()
+    }
+  }
+  else if (a.kind === 'note' && px1 != null) {
+    ctx.beginPath()
+    ctx.arc(px1, box.y + 10, 5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    if (a.text) {
+      const txt = a.text.split('\n')[0].slice(0, 28)
+      ctx.fillStyle = color
+      ctx.font = 'bold 10px "Barlow Condensed", sans-serif'
+      ctx.fillText(txt, px1 + 8, box.y + 14)
+    }
+  }
+  ctx.restore()
+}
+
+function _renderValuesAtHover(g, xMin, xMax) {
+  const host = document.getElementById('vals-' + g.id); if (!host) return
+  if (cursorX == null) { host.innerHTML = ''; return }
+
+  const visibleLaps = snapshot.laps.filter(l => lapsVisible.has(l.lap_num))
+  const primaryLapNum = _primaryLapNum(visibleLaps)
+  const multi = g.traces.length > 1
+
+  // For multi-trace groups: show one value per trace (primary lap only) in
+  // trace color. For single-trace groups: show value per lap.
+  const cells = []
+  if (multi) {
+    const primary = visibleLaps.find(l => l.lap_num === primaryLapNum)
+    if (!primary) { host.innerHTML = ''; return }
+    for (const tr of g.traces) {
+      const pts = _lapPoints(primary, tr.key)
+      const best = _nearestPoint(pts, cursorX); if (!best) continue
+      const val = tr.fmtY ? tr.fmtY(best.y) : (typeof best.y === 'number' ? best.y.toFixed(1) : best.y)
+      cells.push(`<div class="ta-chart-val" style="color:${tr.color}">${val}</div>`)
+    }
+  } else {
+    const tr = g.traces[0]
+    for (const lap of visibleLaps) {
+      const pts = _lapPoints(lap, tr.key)
+      const best = _nearestPoint(pts, cursorX); if (!best) continue
+      const idx = snapshot.laps.indexOf(lap)
+      const color = TC.LAP_COLORS[snapshot.laps.length - 1 - idx] || TC.COLORS.muted
+      const val = tr.fmtY ? tr.fmtY(best.y) : (typeof best.y === 'number' ? best.y.toFixed(1) : best.y)
+      cells.push(`<div class="ta-chart-val" style="color:${color}">${val}</div>`)
+    }
+  }
+  host.innerHTML = cells.join('')
+}
+
+function _nearestPoint(pts, targetX) {
+  if (!pts || !pts.length) return null
+  // Binary search since pts are sorted by x.
+  let lo = 0, hi = pts.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (pts[mid].x < targetX) lo = mid + 1; else hi = mid
+  }
+  const a = pts[lo]
+  const b = pts[lo - 1]
+  if (!b) return a
+  return Math.abs(a.x - targetX) < Math.abs(b.x - targetX) ? a : b
+}
+
+// ─── INTERACTION ─────────────────────────────────────────────────────────
+function _setTool(tool) {
+  currentTool = tool
+  document.querySelectorAll('.ta-tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === tool)
+  })
+  document.querySelectorAll('.ta-canvas-wrap').forEach(w => {
+    w.classList.toggle('editing', tool !== 'pan')
+  })
+  _pendingAnn = null
+  _renderHoverOnly()
+}
+
+function _setupColorSwatches() {
+  document.querySelectorAll('.ta-swatch').forEach(s => {
+    s.addEventListener('click', () => {
+      currentColor = s.dataset.color
+      document.querySelectorAll('.ta-swatch').forEach(x => x.classList.remove('active'))
+      s.classList.add('active')
+    })
+  })
+}
+
+// FIX: annotations mouse coords now use e.offsetX / e.offsetY — these are
+// always relative to the event target's padding box (the anno canvas), so
+// they stay correct regardless of page or container scroll. The previous
+// formula (e.clientX - rect.left) broke when the #ta-charts-scroll container
+// had been scrolled, because rect.top was read after layout shifts.
+function _onMouseMove(e) {
+  const canvas = e.currentTarget
+  const wrap   = canvas.parentElement
+  const px     = e.offsetX                           // FIX: scroll-insensitive
+  cursorX = _xFromPixel(wrap, px)
+
+  if (_pendingAnn && _pendingAnn._drawing) {
+    if (_pendingAnn.kind === 'draw') {
+      const py = e.offsetY                           // FIX: scroll-insensitive
+      const box = _getBox(wrap.querySelector('canvas.base'), false)
+      const yNorm = Math.max(0, Math.min(1, 1 - (py - box.y) / box.h))
+      _pendingAnn._points.push({ x: cursorX, y: yNorm })
+    } else {
+      _pendingAnn.t_end = cursorX
+    }
+  }
+  _renderHoverOnly()
+}
+
+function _onMouseDown(e) {
+  if (currentTool === 'pan') return
+  const canvas = e.currentTarget
+  const gid    = canvas._groupId
+  const wrap   = canvas.parentElement
+  const px     = e.offsetX                           // FIX: scroll-insensitive
+  const t      = _xFromPixel(wrap, px)
+
+  if (currentTool === 'note') {
+    // Note overlay uses viewport coords for position:fixed; clientX/Y is correct here.
+    _spawnNoteOverlay(e.clientX, e.clientY, gid, t)
+    return
+  }
+
+  _pendingAnn = {
+    kind:    currentTool,
+    channel: gid,
+    color:   currentColor,
+    t_start: t,
+    t_end:   t,
+    text:    '',
+    path_data: '',
+    _drawing: true,
+    _points:  currentTool === 'draw' ? [{ x: t, y: 0.5 }] : null,
+  }
+}
+
+function _onMouseUp(e) {
+  if (!_pendingAnn || !_pendingAnn._drawing) return
+  _pendingAnn._drawing = false
+  if (_pendingAnn.kind === 'draw') {
+    _pendingAnn.path_data = _encodePath(_pendingAnn._points)
+  }
+  if (_pendingAnn.kind !== 'draw' && _pendingAnn.kind !== 'note' &&
+      Math.abs((_pendingAnn.t_end || 0) - (_pendingAnn.t_start || 0)) < 0.05) {
+    _pendingAnn = null
+    _renderHoverOnly()
+    return
+  }
+  _commitPending()
+}
+
+function _onClick(e) {
+  if (currentTool !== 'pan') return
+  const canvas = e.currentTarget
+  const gid = canvas._groupId
+  const wrap = canvas.parentElement
+  const px = e.offsetX                               // FIX: scroll-insensitive
+  const targetT = _xFromPixel(wrap, px)
+  const group = groups.find(g => g.id === gid)
+  const groupKeys = new Set([gid, ...(group?.traces || []).map(t => t.key)])
+
+  let best = null, bestDt = 0.3
+  for (const a of annotations) {
+    if (!groupKeys.has(a.channel)) continue
+    const at = a.t_start
+    if (at == null) continue
+    const dt = Math.abs(at - targetT)
+    if (dt < bestDt) { best = a; bestDt = dt }
+  }
+  selectedAnn = best ? best.id : null
+  _renderAnnotationsList()
+  _renderHoverOnly()
+}
+
+async function _commitPending() {
+  if (!_pendingAnn) return
+  const a = _pendingAnn
+  _pendingAnn = null
+  // Local-only mode: no persistence.
+  if (SCOPE !== 'vps') {
+    a.id = 'local_' + Math.random().toString(36).slice(2, 10)
+    a.author_id = _currentUser?.id || 'you'
+    a.created_at = Math.floor(Date.now() / 1000)
+    annotations.push(a)
+    _toast('Annotation added locally (not persisted)', 'success')
+    _renderAnnotationsList()
+    _renderHoverOnly()
+    return
+  }
+  try {
+    const res = await TelemetryVPS.createAnnotation(REC_ID, {
+      kind:      a.kind,
+      lap:       null,
+      t_start:   a.t_start,
+      t_end:     a.t_end,
+      channel:   a.channel,
+      color:     a.color,
+      text:      a.text || '',
+      path_data: a.path_data || '',
+    })
+    a.id = res.id
+    a.created_at = res.created_at
+    a.author_id  = _currentUser?.id || null
+    annotations.push(a)
+    _renderAnnotationsList()
+    _renderHoverOnly()
+  } catch (err) {
+    console.error(err)
+    _toast('Save annotation failed: ' + err.message, 'error')
+  }
+}
+
+// ─── NOTE OVERLAY ───────────────────────────────────────────────────────
+function _spawnNoteOverlay(sx, sy, channel, t) {
+  const host = document.getElementById('ta-note-overlay-host')
+  host.innerHTML = `
+    <div class="ta-note-overlay" style="left:${sx}px; top:${sy}px">
+      <textarea id="ta-note-input" placeholder="Note…"></textarea>
+      <div class="ta-note-overlay-actions">
+        <button class="ta-tool-btn"        onclick="_cancelNote()">Cancel</button>
+        <button class="ta-tool-btn active" onclick="_saveNote('${channel}', ${t})">Save</button>
+      </div>
+    </div>`
+  setTimeout(() => document.getElementById('ta-note-input')?.focus(), 30)
+}
+function _cancelNote() { document.getElementById('ta-note-overlay-host').innerHTML = '' }
+
+async function _saveNote(channel, t) {
+  const text = document.getElementById('ta-note-input').value.trim()
+  _cancelNote()
+  if (!text) return
+  _pendingAnn = {
+    kind: 'note', channel, color: currentColor,
+    t_start: t, t_end: t, text, path_data: '',
+  }
+  await _commitPending()
+}
+
+// ─── ANNOTATIONS LIST (toolbar dropdown) ────────────────────────────────
+function _renderAnnotationsList() {
+  _updateAnnotationsCount()
+  const host = document.getElementById('ta-ann-list')
+  if (!annotations.length) {
+    const msg = SCOPE === 'vps'
+      ? 'No team annotations yet. Pick a tool above to add one.'
+      : 'Local files don\'t support persistent annotations. Open a VPS recording to annotate.'
+    host.innerHTML = `<div class="ta-ann-empty">${msg}</div>`
+    return
+  }
+  host.innerHTML = annotations.map(a => {
+    const badge = _kindBadge(a.kind, a.color)
+    const sel = selectedAnn === a.id ? ' selected' : ''
+    const author = a.author_id ? a.author_id.slice(0, 10) : '—'
+    const when   = a.created_at ? new Date(a.created_at * 1000).toLocaleString() : ''
+    const ts     = (a.t_start != null) ? ` · ${a.t_start.toFixed(2)}s` : ''
+    return `<div class="ta-ann-item${sel}" onclick="_selectAnn('${a.id}')">
+      <button class="ta-ann-del" onclick="event.stopPropagation(); _deleteAnn('${a.id}')" title="Delete">×</button>
+      ${badge}
+      <span style="color:var(--muted);font-size:10px">${a.channel || '*'}${ts}</span>
+      <div class="ta-ann-text">${a.text ? _esc(a.text) : '<span style="color:var(--muted)">(no text)</span>'}</div>
+      <div class="ta-ann-author">${author} · ${when}</div>
+    </div>`
+  }).join('')
+}
+function _kindBadge(kind, color) {
+  const c = color || '#C8FF00'
+  return `<span class="ta-ann-kind" style="background:${c}1a;color:${c}">${kind}</span>`
+}
+function _selectAnn(id) { selectedAnn = id; _renderAnnotationsList(); _renderHoverOnly() }
+async function _deleteAnn(id) {
+  if (!confirm('Delete annotation?')) return
+  if (SCOPE === 'vps' && !String(id).startsWith('local_')) {
+    try { await TelemetryVPS.deleteAnnotation(id) }
+    catch (e) { _toast('Delete failed: ' + e.message, 'error'); return }
+  }
+  annotations = annotations.filter(a => a.id !== id)
+  if (selectedAnn === id) selectedAnn = null
+  _renderAnnotationsList()
+  _renderHoverOnly()
+}
+
+// ─── PATH ENCODING (free draw) ──────────────────────────────────────────
+function _encodePath(points) {
+  return points.map(p => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(';')
+}
+function _decodePath(str) {
+  if (!str) return []
+  return str.split(';').map(pair => {
+    const [x, y] = pair.split(',').map(Number)
+    return { x, y }
+  }).filter(p => !Number.isNaN(p.x) && !Number.isNaN(p.y))
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────
+function _esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]))
+}
+function _toast(msg, kind = 'success') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = 'show ' + kind
+  clearTimeout(el._t)
+  el._t = setTimeout(() => { el.className = kind }, 2500)
+}
+</script>
+</body>
+</html>

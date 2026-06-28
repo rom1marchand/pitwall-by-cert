@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Race Engineer Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  .widget { width: 280px; padding: 10px; }
+  .feed { flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+
+  .msg {
+    display: grid; grid-template-columns: 24px 1fr auto;
+    gap: 8px; align-items: center;
+    padding: 8px 10px; border-radius: 4px;
+    background: rgba(25, 25, 25, 0.9); border-left: 3px solid var(--muted);
+    animation: msg-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 0.4s, transform 0.4s;
+    border: 1px solid var(--border2);
+    border-left-width: 4px;
+  }
+  @keyframes msg-in { from { opacity: 0; transform: translateX(-15px); } to { opacity: 1; transform: translateX(0); } }
+
+  .msg.p-info     { border-left-color: var(--blue); }
+  .msg.p-warning  { border-left-color: var(--amber); background: rgba(255, 176, 32, 0.1); }
+  .msg.p-critical { border-left-color: var(--red); background: rgba(255, 68, 68, 0.15); animation: msg-in 0.3s ease-out, crit-pulse 1s alternate infinite; }
+  
+  .msg.p-critical[data-cat="YELLOW_FLAG"] { border-left-color: #FFD700; background: rgba(255, 215, 0, 0.15); }
+
+  @keyframes crit-pulse { to { border-left-color: #fff; box-shadow: inset 5px 0 15px rgba(255,0,0,0.2); } }
+
+  .msg.fade { opacity: 0.4; }
+  .msg.fading-out { opacity: 0; transform: translateY(10px); }
+
+  .m-icon { font-size: 16px; text-align: center; }
+  .m-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .m-text { font-size: 13px; font-weight: 700; line-height: 1.2; color: #fff; word-wrap: break-word; }
+  .m-meta { font-size: 9px; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .m-age { font-size: 10px; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* Gère l'affichage vide dynamique */
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 4px; padding: 20px 0; }
+  .empty-icon { font-size: 28px; transition: color 0.3s, opacity 0.3s; }
+  .empty-text { font-size: 11px; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase; transition: color 0.3s; }
+  .empty-sub { font-size: 9px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Race Engineer</div>
+    <div class="dot" id="dot"></div>
+  </div>
+  <div class="feed" id="feed"></div>
+</div>
+
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  const CATEGORY = {
+    BRAKE_BIAS:      { icon: '🛑', label: 'Brake Bias' },
+    LIFT_AND_COAST:  { icon: '⛽', label: 'Lift & Coast' },
+    TYRE_MANAGEMENT: { icon: '🛞', label: 'Tyres' },
+    FUEL_ALERT:      { icon: '⛽', label: 'Fuel' },
+    GENERAL:         { icon: '💬', label: 'General' },
+    YELLOW_FLAG:     { icon: '⚠️', label: 'Safety' },
+    LOCKUP:          { icon: '💨', label: 'Lock-Up' },
+    WHEELSPIN:       { icon: '🔥', label: 'Wheelspin' },
+    HYBRID_SOC:      { icon: '🔋', label: 'Hybrid' },
+  };
+
+  const MAX_MSGS = 4;              
+  const MAX_AGE_MS = 30 * 1000;    
+  const REMOVE_AGE_MS = 60 * 1000;
+
+  const messages = [];  
+  let _nextId = 1;
+
+  // Nouvelle fonction dynamique pour le statut de connexion
+  function updateEmptyState() {
+    const feed = $('feed');
+    
+    // S'il y a des messages, on supprime l'écran vide
+    if (messages.length > 0) {
+      const empty = feed.querySelector('.empty');
+      if (empty) feed.removeChild(empty);
+      return;
+    }
+
+    // Sinon, on crée ou on met à jour l'écran vide
+    let empty = feed.querySelector('.empty');
+    if (!empty) {
+      empty = document.createElement('div');
+      empty.className = 'empty';
+      feed.appendChild(empty);
+    }
+
+    // Overlay.state.connected est géré automatiquement par overlay-common.js
+    const isConnected = Overlay && Overlay.state && Overlay.state.connected;
+
+    if (isConnected) {
+      empty.innerHTML = `
+        <div class="empty-icon" style="color: var(--lime); opacity: 0.9;">🎧</div>
+        <div class="empty-text" style="color: #fff;">Engineer Online</div>
+        <div class="empty-sub">Listening to telemetry...</div>
+      `;
+    } else {
+      empty.innerHTML = `
+        <div class="empty-icon" style="color: var(--muted); opacity: 0.4;">🔌</div>
+        <div class="empty-text" style="color: var(--muted);">Awaiting Engineer...</div>
+        <div class="empty-sub">Backend disconnected</div>
+      `;
+    }
+  }
+
+  function makeMsgEl(msg) {
+    const cat = CATEGORY[msg.category] || CATEGORY.GENERAL;
+    const el = document.createElement('div');
+    el.className = 'msg p-' + (msg.priority || 'info').toLowerCase();
+    el.dataset.cat = msg.category;
+    el.innerHTML = `
+      <div class="m-icon">${cat.icon}</div>
+      <div class="m-body"><div class="m-text"></div><div class="m-meta">${cat.label}</div></div>
+      <div class="m-age">now</div>
+    `;
+    el.querySelector('.m-text').textContent = msg.text;
+    return el;
+  }
+
+  function addMessage({ text, category, priority }) {
+    if (!text) return;
+    const msg = { id: _nextId++, text: String(text), category: (category || 'GENERAL').toUpperCase(), priority: (priority || 'INFO').toUpperCase(), ts: Date.now() };
+    messages.unshift(msg);
+    
+    while (messages.length > MAX_MSGS) {
+      const removed = messages.pop();
+      if (removed.el && removed.el.parentNode) removed.el.parentNode.removeChild(removed.el);
+    }
+    
+    msg.el = makeMsgEl(msg);
+    $('feed').insertBefore(msg.el, $('feed').firstChild);
+    updateEmptyState(); // Cache le texte "Engineer Online"
+  }
+
+  function updateAges() {
+    const now = Date.now();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (!m.el) continue;
+      const age = now - m.ts;
+      m.el.querySelector('.m-age').textContent = age < 3000 ? 'now' : Math.floor(age / 1000) + 's';
+      m.el.classList.toggle('fade', age > MAX_AGE_MS);
+      
+      const removeAt = m.priority === 'CRITICAL' ? REMOVE_AGE_MS * 2 : REMOVE_AGE_MS;
+      if (age > removeAt) {
+        m.el.classList.add('fading-out');
+        setTimeout(() => { if (m.el && m.el.parentNode) m.el.parentNode.removeChild(m.el); }, 400);
+        messages.splice(i, 1);
+      }
+    }
+    updateEmptyState(); // Met à jour le statut en temps réel
+  }
+
+  // Initialisation
+  updateEmptyState();
+  
+  Overlay.init({
+    liveDot: $('dot'),
+    onEvent: (evt) => { if (evt.name === 'engineer' && evt.data) addMessage(evt.data); },
+  });
+  
+  // Exécute updateAges toutes les secondes
+  setInterval(updateAges, 1000);
+</script>
+</body>
+</html>

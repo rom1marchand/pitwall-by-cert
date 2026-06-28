@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stint Summary — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="stint-engine.js"></script>
+<style>
+.sp-subnav { display:flex; gap:2px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--border); }
+.sp-subnav a { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
+.sp-subnav a:hover { color:var(--text); }
+.sp-subnav a.active { color:var(--lime); border-bottom-color:var(--lime); }
+
+.summary-page { max-width:1100px; margin:0 auto; padding:24px 20px; }
+
+/* ── CATEGORY BADGE ── */
+.cat-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid var(--border); border-radius:2px; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--lime); margin-bottom:16px; }
+
+/* ── RACE TOTALS ── */
+.totals-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:28px; }
+.total-card { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:16px; text-align:center; }
+.total-label { font-size:9px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.total-value { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:900; }
+.total-value.lime { color:var(--lime); }
+.total-sub { font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ── DRIVER CARDS ── */
+.drivers-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin-bottom:28px; }
+.driver-card { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:16px; border-left:4px solid var(--muted); }
+.dc-top { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.dc-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:900; color:#000; }
+.dc-name { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; flex:1; }
+.dc-pct { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:900; color:var(--lime); }
+.dc-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.dc-stat-label { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.dc-stat-value { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; }
+
+/* ── TYRE TABLE ── */
+.tyre-table { width:100%; border-collapse:collapse; margin-bottom:28px; }
+.tyre-table th { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); }
+.tyre-table td { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600; padding:8px 10px; border-bottom:1px solid rgba(34,34,34,.5); }
+.health-bar { display:inline-block; width:60px; height:6px; border-radius:3px; background:var(--border); vertical-align:middle; margin-left:6px; }
+.health-fill { height:100%; border-radius:3px; }
+
+/* ── TYRE ALLOC ── */
+.alloc-bar { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:14px 18px; margin-bottom:24px; display:flex; align-items:center; gap:16px; }
+.alloc-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.alloc-val { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:900; }
+.alloc-remaining { color:var(--lime); }
+.alloc-used { color:var(--muted); font-size:14px; }
+
+/* ── LIFT SUGGESTION ── */
+.lift-banner { background:rgba(200,255,0,.06); border:1px solid rgba(200,255,0,.2); border-radius:4px; padding:14px 18px; margin-bottom:24px; display:flex; align-items:center; gap:12px; }
+.lift-icon { font-size:20px; }
+.lift-text { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:600; flex:1; }
+.lift-gain { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:900; color:var(--lime); }
+
+/* ── PIT BREAKDOWN ── */
+.pit-table { width:100%; border-collapse:collapse; margin-bottom:28px; }
+.pit-table th { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); }
+.pit-table td { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600; padding:8px 10px; border-bottom:1px solid rgba(34,34,34,.5); }
+
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; color:var(--muted); gap:12px; }
+.empty-state a { color:var(--lime); text-decoration:none; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="sp-subnav">
+  <a href="stint-setup.html">Setup</a>
+  <a href="stint-summary.html" class="active">Summary</a>
+  <a href="stint-plan.html">Plan</a>
+  <a href="stint-tyres.html">Tyres</a>
+</div>
+
+<div class="summary-page">
+  <div id="content">
+    <div class="empty-state">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">No strategy calculated yet</div>
+      <div>Go to <a href="stint-setup.html">Setup</a> to configure and calculate</div>
+    </div>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+renderHeader(lineupId ? 'lineup' : 'local', 'stint-plan')
+if (_checkPopoutOverlay('stint-plan')) throw ''
+
+const activeScenario = sessionStorage.getItem('sp_scenario') || 'default'
+
+async function loadData() {
+  try {
+    const params = JSON.parse(sessionStorage.getItem('sp_params') || '{}')
+    const drivers = JSON.parse(sessionStorage.getItem('sp_drivers') || '[]')
+    const weather = JSON.parse(sessionStorage.getItem('sp_weather') || '[]')
+    const tyreConfigs = JSON.parse(sessionStorage.getItem('sp_tyre_configs') || '[]')
+
+    if (!params.race_duration_s) return
+
+    const result = await StintPlanAPI.calculate(activeScenario, params, drivers, weather, tyreConfigs)
+    renderSummary(result)
+  } catch (err) {
+    console.error('[StintSummary]', err)
+  }
+}
+
+function renderSummary(r) {
+  const s = r.summary
+  const mode = r.energy_mode || 'fuel'
+  const energyUnit = s.energy_unit || 'L'
+  const cat = r.category || {}
+
+  let html = ''
+
+  // Category badge
+  if (cat.label) {
+    html += `<div class="cat-badge">${esc(cat.short || cat.label)} — ${cat.fuel_capacity_l || '?'}L tank</div>`
+  }
+
+  // Lift & Coast suggestion
+  if (r.lift_suggestion && r.lift_suggestion.recommended) {
+    const ls = r.lift_suggestion
+    html += `
+      <div class="lift-banner">
+        <div class="lift-icon">\u26A1</div>
+        <div class="lift-text">${esc(ls.message)}</div>
+        <div class="lift-gain">-${ls.current_stops - ls.lc_stops} pit stop${(ls.current_stops - ls.lc_stops) > 1 ? 's' : ''}</div>
+      </div>`
+  }
+
+  // Race totals
+  html += `<div class="totals-grid">
+    <div class="total-card">
+      <div class="total-label">Total Laps</div>
+      <div class="total-value lime">${s.total_laps}</div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Pit Stops</div>
+      <div class="total-value">${s.pit_stops}</div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Total ${mode === 've' ? 'Energy' : 'Fuel'}</div>
+      <div class="total-value">${(s.total_fuel_l || 0).toFixed(0)}<span style="font-size:14px;color:var(--muted)">${esc(energyUnit)}</span></div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Pit Time</div>
+      <div class="total-value">${fmtDuration(s.total_pit_time_s)}</div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Predicted Finish</div>
+      <div class="total-value lime">${s.predicted_finish}</div>
+      <div class="total-sub">${fmtDuration(s.total_race_time_s)} total</div>
+    </div>
+  </div>`
+
+  // Tyre allocation
+  if (cat.tyre_allocation && cat.tyre_allocation < 999) {
+    html += `<div class="alloc-bar">
+      <div><div class="alloc-label">Tyre Allocation</div></div>
+      <div class="alloc-val alloc-remaining">${cat.tyres_remaining} remaining</div>
+      <div class="alloc-used">${cat.tyres_used} / ${cat.tyre_allocation} used</div>
+    </div>`
+  }
+
+  // Driver cards
+  const ds = r.driver_summary || {}
+  const driverIds = Object.keys(ds)
+  if (driverIds.length) {
+    html += '<div class="section-label">Driver Distribution</div><div class="drivers-grid">'
+    for (const did of driverIds) {
+      const d = ds[did]
+      html += `
+        <div class="driver-card" style="border-left-color:${d.color}">
+          <div class="dc-top">
+            <div class="dc-avatar" style="background:${d.color}">${d.name.charAt(0)}</div>
+            <div class="dc-name">${esc(d.name)}</div>
+            <div class="dc-pct">${d.pct_of_race}%</div>
+          </div>
+          <div class="dc-stats">
+            <div><div class="dc-stat-label">Stints</div><div class="dc-stat-value">${d.stints}</div></div>
+            <div><div class="dc-stat-label">Laps</div><div class="dc-stat-value">${d.total_laps}</div></div>
+            <div><div class="dc-stat-label">Drive time</div><div class="dc-stat-value">${fmtDuration(d.total_time_s)}</div></div>
+            <div><div class="dc-stat-label">Avg lap</div><div class="dc-stat-value">${fmtLapTime(d.avg_lap_s)}</div></div>
+          </div>
+        </div>`
+    }
+    html += '</div>'
+  }
+
+  // Pit stop breakdown table
+  const pitsStints = r.stints.filter(st => st.pit_stop)
+  if (pitsStints.length) {
+    html += '<div class="section-label">Pit Stop Breakdown</div>'
+    html += `<table class="pit-table"><thead><tr>
+      <th>Before Stint</th><th>At Lap</th><th>Fuel</th><th>T_fuel</th><th>Tyres</th><th>T_tyres</th><th>Driver</th><th>Total</th>
+    </tr></thead><tbody>`
+    for (const st of pitsStints) {
+      const p = st.pit_stop
+      const freeTag = p.free_tyre_change ? ' <span style="color:var(--lime);font-size:10px">FREE</span>' : ''
+      html += `<tr>
+        <td>#${st.id}</td>
+        <td>${p.at_lap}</td>
+        <td>${p.fuel_volume_l}L</td>
+        <td>${p.t_fuel_s}s</td>
+        <td>${p.num_tyres} tyres${freeTag}</td>
+        <td>${p.t_tyres_s}s</td>
+        <td>${p.driver_change ? '<span style="color:var(--lime)">\u2192 ' + esc(p.driver_change_to) + '</span>' : '\u2014'}</td>
+        <td style="font-weight:900;color:var(--lime)">${p.total_time_s}s</td>
+      </tr>`
+    }
+    html += '</tbody></table>'
+  }
+
+  // Tyre wear per stint
+  html += '<div class="section-label">Tyre Wear Per Stint</div>'
+  html += `<table class="tyre-table"><thead><tr>
+    <th>Stint</th><th>Driver</th><th>Compound</th><th>Laps</th>
+    <th>FL</th><th>FR</th><th>RL</th><th>RR</th><th>Temp</th><th>Pressure</th>
+  </tr></thead><tbody>`
+
+  for (const stint of r.stints) {
+    const te = stint.tyres_end || {}
+    const cpd = (r.compounds || {})[stint.compound] || {}
+    const pp = stint.pressure_profile || {}
+    const pressureStr = pp.front_psi ? `F:${pp.front_psi[0]}-${pp.front_psi[1]} R:${pp.rear_psi[0]}-${pp.rear_psi[1]}` : '\u2014'
+    html += `<tr>
+      <td>#${stint.id}</td>
+      <td style="color:${stint.driver_color}">${esc(stint.driver_name)}</td>
+      <td>${compoundBadge(stint.compound, r.compounds)} ${cpd.label || stint.compound}</td>
+      <td>${stint.laps}</td>
+      ${CORNERS.map(c => {
+        const v = Math.round(te[c] || 0)
+        const col = tyreHealthColor(v)
+        return `<td>${v}% <span class="health-bar"><span class="health-fill" style="width:${v}%;background:${col}"></span></span></td>`
+      }).join('')}
+      <td style="font-size:11px;color:var(--muted)">${stint.track_temp_c}\u00B0C</td>
+      <td style="font-size:10px;color:var(--muted)">${pressureStr}</td>
+    </tr>`
+  }
+  html += '</tbody></table>'
+
+  document.getElementById('content').innerHTML = html
+}
+
+loadData()
+</script>
+</body>
+</html>

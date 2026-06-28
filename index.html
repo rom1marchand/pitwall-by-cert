@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitwall — powered by CERT Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<style>
+body { display:flex; align-items:center; justify-content:center; min-height:100vh; position:relative; overflow:hidden; }
+body::before { content:''; position:fixed; inset:0;
+  background:radial-gradient(ellipse 60% 50% at 50% 60%,rgba(200,255,0,.05) 0%,transparent 70%);
+  pointer-events:none; }
+.login-box { position:relative; z-index:1; text-align:center; max-width:420px; padding:0 24px; }
+.login-eyebrow { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:600;
+  letter-spacing:.25em; text-transform:uppercase; color:var(--muted); margin-bottom:24px; }
+.login-title { font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(72px,13vw,104px); font-weight:900; line-height:.88;
+  text-transform:uppercase; letter-spacing:-.02em; }
+.login-title span { color:var(--lime); }
+.login-sub { margin:20px 0 36px; font-size:14px; color:var(--muted); line-height:1.7; }
+.login-sub strong { color:var(--text); }
+.btn-steam { display:inline-flex; align-items:center; gap:12px;
+  background:var(--lime); color:var(--black); font-family:'Barlow Condensed',sans-serif;
+  font-size:16px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  padding:14px 32px; border-radius:2px; border:none; cursor:pointer;
+  transition:background .15s,transform .1s; }
+.btn-steam:hover { background:#d9ff26; transform:translateY(-1px); }
+.btn-steam svg { width:20px; height:20px; fill:var(--black); }
+.login-credit { margin-top:44px; font-size:11px; color:#333; line-height:1.9; }
+.login-credit a { color:#444; text-decoration:none; }
+.login-credit a:hover { color:var(--muted); }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="login-box">
+  <div class="login-eyebrow">Pitwall · powered by CERT Team</div>
+  <div class="login-title">PIT<br><span>WALL</span></div>
+  <p class="login-sub" data-i18n="loginSub">Live race data for <strong>CERT Racing</strong> and your team.<br>Connect with Steam to access your pitwall.</p>
+  <button id="btn-steam" class="btn-steam">
+    <svg viewBox="0 0 24 24"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/></svg>
+    Sign in with Steam
+  </button>
+  <p class="login-credit">
+    Data acquisition library by <a href="https://github.com/s-victor/TinyPedal" target="_blank">S.Victor — TinyPedal</a><br>
+    Pitwall v2 · CERT Endurance Racing Team
+  </p>
+  <div id="index-lang" style="margin-top:20px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap"></div>
+</div>
+<script>
+injectSharedCSS()
+const hash = location.hash
+if (hash.startsWith('#token=')) {
+  Auth.setToken(hash.slice(7))
+  history.replaceState(null,'',location.pathname)
+}
+if (Auth.getToken()) { location.href = 'main.html' }
+
+// Apply i18n
+I18n.apply()
+
+// Steam button text
+document.getElementById('btn-steam').lastChild.textContent = ' ' + I18n.t('signInSteam')
+
+// Dynamic language buttons
+const langContainer = document.getElementById('index-lang')
+langContainer.innerHTML = I18n.availableLangs.map((l, i) => {
+  const active = I18n.lang === l
+  const color = active ? '#C8FF00' : '#444'
+  const sep = i > 0 ? '<span style="color:#333">|</span>' : ''
+  return `${sep}<button onclick="setLang('${l}')" style="background:none;border:none;color:${color};font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.15em;cursor:pointer;transition:color .15s" onmouseover="this.style.color='#C8FF00'" onmouseout="this.style.color='${active ? '#C8FF00' : '#444'}'">${l.toUpperCase()}</button>`
+}).join('')
+
+document.getElementById('btn-steam').onclick = e => {
+  e.preventDefault()
+  if (window.electronAPI?.openExternal) window.electronAPI.openExternal(Auth.steamLoginUrl())
+  else window.open(Auth.steamLoginUrl(), '_blank')
+}
+</script>
+</body>
+</html>

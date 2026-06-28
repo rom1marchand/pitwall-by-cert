@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Delta</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  /* Big delta value */
+  .delta-main{display:flex;align-items:baseline;justify-content:center;gap:3px;}
+  .delta-val{
+    font-size:52px;font-weight:900;line-height:1;
+    font-variant-numeric:tabular-nums;letter-spacing:-2px;
+    text-align:center;
+    transition:color 0.1s;
+  }
+  .delta-val.good{color:var(--lime);text-shadow:0 0 20px rgba(200,255,0,0.25);}
+  .delta-val.bad {color:var(--red); text-shadow:0 0 20px rgba(255,68,68,0.25);}
+  .delta-val.neutral{color:#e8e8e8;}
+
+  /* Progress bar */
+  .delta-bar-wrap{height:8px;background:rgba(255,255,255,0.06);border-radius:3px;position:relative;overflow:hidden;border:1px solid var(--border2);}
+  .delta-center-line{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2);z-index:2;}
+  .delta-fill{position:absolute;top:0;bottom:0;z-index:1;transition:width 0.08s linear,left 0.08s linear,right 0.08s linear;}
+  .delta-fill.good{background:linear-gradient(90deg,transparent,var(--lime));right:50%;left:auto;}
+  .delta-fill.bad {background:linear-gradient(270deg,transparent,var(--red));left:50%;right:auto;box-shadow:0 0 12px rgba(255,68,68,0.4);}
+
+  /* Sparkline chart */
+  .chart-wrap{position:relative;flex:1;min-height:40px;}
+  .chart-wrap svg{position:absolute;inset:0;width:100%;height:100%;}
+  .spark-line{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+  .spark-line.good{stroke:var(--lime);}
+  .spark-line.bad {stroke:var(--red);}
+  .spark-area{opacity:0.12;}
+  .spark-area.good{fill:var(--lime);}
+  .spark-area.bad {fill:var(--red);}
+  .zero-line{stroke:rgba(255,255,255,0.12);stroke-width:1;stroke-dasharray:2,3;}
+  .chart-axis{font-size:7px;fill:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;}
+
+  /* Sector crossing banner (Page 1 overlay) */
+  .sector-banner {
+    position:absolute; left:50%; top:8px; transform:translate(-50%,-8px);
+    padding:4px 10px; border-radius:3px;
+    background:rgba(7,7,7,0.85); border:1px solid var(--lime);
+    font-size:12px; font-weight:900; letter-spacing:0.1em;
+    font-variant-numeric:tabular-nums;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.25s, transform 0.25s;
+    z-index:20;
+  }
+  .sector-banner.show { opacity:1; transform:translate(-50%,0); }
+  .sector-banner.bad { border-color:var(--red); color:var(--red); box-shadow:0 0 10px rgba(255,68,68,0.35); }
+  .sector-banner.good { border-color:var(--lime); color:var(--lime); box-shadow:0 0 10px rgba(200,255,0,0.25); }
+
+  /* ─── Page 2 : sector breakdown ──────────────────────────────────────── */
+  .sec-list { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .sec-row {
+    display:grid; grid-template-columns:28px 1fr auto;
+    gap:8px; align-items:center;
+    padding:6px 9px; border-radius:3px;
+    background:var(--bg2); border-left:3px solid var(--muted2);
+  }
+  .sec-row.good { border-left-color:var(--lime); background:rgba(200,255,0,0.05); }
+  .sec-row.bad  { border-left-color:var(--red);  background:rgba(255,68,68,0.07); }
+  .sec-row.live { box-shadow:0 0 0 1px rgba(200,255,0,0.5); }
+  .sec-tag { font-size:13px; font-weight:900; color:var(--muted); letter-spacing:0.06em; }
+  .sec-row.good .sec-tag { color:var(--lime); }
+  .sec-row.bad  .sec-tag { color:var(--red); }
+  .sec-time { font-size:11px; font-weight:700; color:var(--muted2); font-variant-numeric:tabular-nums; }
+  .sec-delta { font-size:16px; font-weight:900; font-variant-numeric:tabular-nums; text-align:right; }
+
+  .page { display:flex; flex-direction:column; gap:5px; flex:1; min-height:0; position:relative; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <!-- ═══ Page 1 : live delta ══════════════════════════════════════════ -->
+  <div class="page" id="page-main">
+    <!-- Sector crossing banner (non-modal, fades 3s) -->
+    <div class="sector-banner" id="sec-banner">—</div>
+
+    <!-- Big value -->
+    <div class="delta-main">
+      <div class="delta-val neutral" id="dval">—</div>
+    </div>
+
+    <!-- Bar -->
+    <div class="delta-bar-wrap">
+      <div class="delta-center-line"></div>
+      <div class="delta-fill" id="dbar"></div>
+    </div>
+
+    <!-- Sparkline chart -->
+    <div class="chart-wrap">
+      <svg id="spark" viewBox="0 0 200 50" preserveAspectRatio="none">
+        <line class="zero-line" x1="0" y1="25" x2="200" y2="25"/>
+        <text class="chart-axis" x="2" y="8">+1.5</text>
+        <text class="chart-axis" x="2" y="46">-1.5</text>
+        <path class="spark-area good" id="spark-area" d=""/>
+        <path class="spark-line good" id="spark-line" d=""/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ═══ Page 2 : sector breakdown ═══════════════════════════════════ -->
+  <div class="page" id="page-sectors" style="display:none">
+    <div class="sec-list">
+      <div class="sec-row" id="sec-1">
+        <div class="sec-tag">S1</div>
+        <div class="sec-time"><span id="s1-cur">—</span> <span style="color:var(--muted)">vs</span> <span id="s1-ref">—</span></div>
+        <div class="sec-delta" id="s1-d">—</div>
+      </div>
+      <div class="sec-row" id="sec-2">
+        <div class="sec-tag">S2</div>
+        <div class="sec-time"><span id="s2-cur">—</span> <span style="color:var(--muted)">vs</span> <span id="s2-ref">—</span></div>
+        <div class="sec-delta" id="s2-d">—</div>
+      </div>
+      <div class="sec-row" id="sec-3">
+        <div class="sec-tag">S3</div>
+        <div class="sec-time"><span id="s3-cur">—</span> <span style="color:var(--muted)">vs</span> <span id="s3-ref">—</span></div>
+        <div class="sec-delta" id="s3-d">—</div>
+      </div>
+      <div class="sec-row" id="sec-lap" style="margin-top:2px">
+        <div class="sec-tag" style="font-size:11px">LAP</div>
+        <div class="sec-time"><span id="lap-cur">—</span> <span style="color:var(--muted)">vs</span> <span id="lap-ref">—</span></div>
+        <div class="sec-delta" id="lap-d">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const MAX_DELTA = 1.5;
+  const HISTORY_LEN = 60;
+  const history = [];
+
+  // ─── Page 1 : live delta ──────────────────────────────────────────────
+  function renderDelta(val) {
+    const el = $('dval'), bar = $('dbar');
+    if (val == null || isNaN(val)) {
+      el.textContent = '—'; el.className = 'delta-val neutral';
+      bar.style.width = '0%'; return;
+    }
+    const isGood = val <= 0;
+    el.textContent = (isGood ? '' : '+') + val.toFixed(3);
+    el.className = 'delta-val ' + (isGood ? 'good' : 'bad');
+    const pct = Math.min(100, (Math.abs(val) / MAX_DELTA) * 100);
+    bar.className = 'delta-fill ' + (isGood ? 'good' : 'bad');
+    bar.style.width = pct + '%';
+  }
+
+  function updateSparkline() {
+    if (history.length < 2) return;
+    const W=200, H=50, pad=2;
+    const isGood = history[history.length-1] <= 0;
+    const cls = isGood ? 'good' : 'bad';
+    $('spark-line').className = 'spark-line ' + cls;
+    $('spark-area').className = 'spark-area ' + cls;
+    const points = history.map((v, i) => {
+      const x = pad + (i / (HISTORY_LEN - 1)) * (W - pad*2);
+      const y = pad + ((v + MAX_DELTA) / (MAX_DELTA * 2)) * (H - pad*2);
+      return [x, Math.max(pad, Math.min(H-pad, y))];
+    });
+    const linePath = points.map((p,i) => (i===0?'M':'L') + p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+    const zeroY = pad + (MAX_DELTA / (MAX_DELTA * 2)) * (H - pad*2);
+    const areaPath = linePath + ` L${points[points.length-1][0].toFixed(1)},${zeroY.toFixed(1)} L${points[0][0].toFixed(1)},${zeroY.toFixed(1)} Z`;
+    $('spark-line').setAttribute('d', linePath);
+    $('spark-area').setAttribute('d', areaPath);
+  }
+
+  // ─── Sector tracking (used by both pages) ─────────────────────────────
+  let _lastSector = -1;     // which sector we were in last tick
+  let _bannerT    = null;
+
+  function showBanner(text, isBad) {
+    const el = $('sec-banner');
+    el.textContent = text;
+    el.className = 'sector-banner show ' + (isBad ? 'bad' : 'good');
+    clearTimeout(_bannerT);
+    _bannerT = setTimeout(() => { el.classList.remove('show'); }, 3000);
+  }
+
+  function fmtLapTime(sec) {
+    if (sec == null || !isFinite(sec) || sec <= 0) return '—';
+    const m = Math.floor(sec / 60);
+    const s = sec - m * 60;
+    return m > 0 ? `${m}:${s.toFixed(3).padStart(6,'0')}` : s.toFixed(3);
+  }
+  function fmtDelta(v) {
+    if (v == null || !isFinite(v)) return '—';
+    return (v > 0 ? '+' : '') + v.toFixed(3);
+  }
+  function applyDeltaClass(row, valueEl, v) {
+    row.classList.remove('good','bad','live');
+    valueEl.style.color = '';
+    if (v == null || !isFinite(v)) return;
+    if (v <= 0) { row.classList.add('good'); valueEl.style.color = 'var(--lime)'; }
+    else        { row.classList.add('bad');  valueEl.style.color = 'var(--red)';  }
+  }
+
+  function renderSectorPage(se) {
+    // Current lap sector times
+    const s1c = se.cur_s1, s2c = se.cur_s2;
+    // Sector 3 is implicit (lap - s1 - s2) if available
+    const s3c = (se.cur_lap_time != null && s1c != null && s2c != null) ? se.cur_lap_time - s1c - s2c : null;
+    // Best-lap references
+    const s1b = se.best_lap_s1, s2b = se.best_lap_s2;
+    const s3b = (se.best_lap != null && s1b != null && s2b != null) ? se.best_lap - s1b - s2b : null;
+    const lapC = se.last_lap ?? se.cur_lap_time;
+    const lapB = se.best_lap;
+
+    const rows = [
+      { r: $('sec-1'), cur: s1c, ref: s1b, curEl: $('s1-cur'), refEl: $('s1-ref'), dEl: $('s1-d') },
+      { r: $('sec-2'), cur: s2c, ref: s2b, curEl: $('s2-cur'), refEl: $('s2-ref'), dEl: $('s2-d') },
+      { r: $('sec-3'), cur: s3c, ref: s3b, curEl: $('s3-cur'), refEl: $('s3-ref'), dEl: $('s3-d') },
+      { r: $('sec-lap'), cur: lapC, ref: lapB, curEl: $('lap-cur'), refEl: $('lap-ref'), dEl: $('lap-d') },
+    ];
+    // Mark the current sector as "live"
+    const liveSec = se.current_sector;
+    for (let i = 0; i < 3; i++) {
+      if ((i + 1) === liveSec) rows[i].r.classList.add('live');
+      else rows[i].r.classList.remove('live');
+    }
+    for (const row of rows) {
+      row.curEl.textContent = fmtLapTime(row.cur);
+      row.refEl.textContent = fmtLapTime(row.ref);
+      const delta = (row.cur != null && row.ref != null) ? (row.cur - row.ref) : null;
+      row.dEl.textContent = fmtDelta(delta);
+      applyDeltaClass(row.r, row.dEl, delta);
+    }
+  }
+
+  // Detect sector boundary crossings → banner + update page 2
+  function detectSectorCrossing(se) {
+    const cur = se.current_sector;
+    if (cur == null || cur === _lastSector) { _lastSector = cur ?? _lastSector; return; }
+    // Crossing from sector N → N+1 means sector N just finished
+    const justFinished = _lastSector;
+    _lastSector = cur;
+    if (justFinished == null || justFinished < 1 || justFinished > 3) return;
+    // Pick the right delta to show
+    let ref = null, val = null;
+    if (justFinished === 1)      { val = se.cur_s1; ref = se.best_lap_s1; }
+    else if (justFinished === 2) { val = se.cur_s2; ref = se.best_lap_s2; }
+    else if (justFinished === 3) {
+      // Full lap — use last_lap vs best_lap
+      val = se.last_lap; ref = se.best_lap;
+    }
+    if (val == null || ref == null) return;
+    const d = val - ref;
+    showBanner(`S${justFinished} — ${fmtDelta(d)}`, d > 0);
+  }
+
+  // ─── Pages + overlay init ─────────────────────────────────────────────
+  Overlay.registerPages([
+    { id: 'main',    label: 'Main',    el: '#page-main' },
+    { id: 'sectors', label: 'Sectors', el: '#page-sectors' },
+  ]);
+
+  Overlay.init({
+    liveDot: null,
+    onData: (s) => {
+      const se = s.session || {};
+      // Live delta + sparkline
+      if (typeof se.delta_best === 'number') {
+        renderDelta(se.delta_best);
+        history.push(se.delta_best);
+        while (history.length > HISTORY_LEN) history.shift();
+        updateSparkline();
+      }
+      // Sector crossing banner (shown on page 1)
+      detectSectorCrossing(se);
+      // Page 2 breakdown
+      renderSectorPage(se);
+    }
+  });
+
+  // Preview fake data
+  const _isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  if (_isPreview) {
+    for (let i=0; i<50; i++) {
+      const t = (i/50) * Math.PI * 2;
+      history.push(Math.sin(t)*0.8 - 0.2);
+    }
+    renderDelta(-0.312);
+    updateSparkline();
+    renderSectorPage({
+      cur_s1: 27.342, cur_s2: 42.815, cur_lap_time: null,
+      best_lap_s1: 27.415, best_lap_s2: 42.902, best_lap: 95.123, last_lap: 95.450,
+      current_sector: 3,
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fuel & Energy</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  .section { margin-bottom:7px; }
+  .section:last-child { margin-bottom:0; }
+
+  /* Gauge row */
+  .gauge-hdr {
+    display:flex; justify-content:space-between; align-items:baseline; margin-bottom:3px;
+  }
+  .gauge-lbl {
+    font-size:9px; font-weight:900; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted);
+  }
+  .gauge-vals {
+    display:flex; align-items:baseline; gap:4px;
+  }
+  .gauge-main {
+    font-size:18px; font-weight:900; font-variant-numeric:tabular-nums;
+  }
+  .gauge-unit { font-size:9px; color:var(--muted); }
+  .gauge-pct  { font-size:11px; color:var(--muted2); font-variant-numeric:tabular-nums; }
+
+  .gauge-bar { height:7px; background:rgba(255,255,255,0.06); border-radius:2px; position:relative; overflow:hidden; margin-bottom:2px; }
+  .gauge-fill {
+    position:absolute; inset:0 100% 0 0;
+    transition:right 0.1s linear, background 0.2s;
+  }
+  .gauge-sub {
+    display:flex; justify-content:space-between;
+    font-size:9px; color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums;
+  }
+
+  /* ERS section */
+  .ers-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; margin-bottom:4px;
+  }
+  .ers-cell { background:var(--bg2); border:1px solid var(--border2); border-radius:3px; padding:4px 6px; }
+  .ers-cell .ec-lbl { font-size:8px; font-weight:900; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+  .ers-cell .ec-val { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1.1; }
+
+  .motor-state {
+    display:flex; align-items:center; gap:5px; padding:3px 6px;
+    background:var(--bg2); border-radius:3px; border:1px solid var(--border2);
+    font-size:10px; font-weight:900; letter-spacing:0.1em; text-transform:uppercase;
+  }
+  .motor-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+  .motor-state.propulsion .motor-dot { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .motor-state.regen      .motor-dot { background:var(--blue);  box-shadow:0 0 6px var(--blue); }
+  .motor-state.propulsion { color:var(--green); border-color:rgba(29,185,84,0.3); }
+  .motor-state.regen      { color:var(--blue);  border-color:rgba(59,167,255,0.3); }
+
+  /* Footer grid */
+  .foot {
+    display:grid; grid-template-columns:1fr 1fr; gap:3px 10px;
+    border-top:1px solid var(--border2); padding-top:5px; margin-top:4px;
+    font-size:11px;
+  }
+  .foot .k { color:var(--muted); font-size:9px; font-weight:900; letter-spacing:0.1em; text-transform:uppercase; }
+  .foot .v { font-weight:900; text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Fuel &amp; Energy</div>
+    <div class="dot" id="dot"></div>
+  </div>
+
+  <!-- FUEL -->
+  <div class="section">
+    <div class="gauge-hdr">
+      <div class="gauge-lbl">Fuel</div>
+      <div class="gauge-vals">
+        <span class="gauge-main" id="fuel-l">—</span><span class="gauge-unit"> L</span>
+        <span class="gauge-pct" id="fuel-pct">—%</span>
+      </div>
+    </div>
+    <div class="gauge-bar"><div class="gauge-fill" id="fuel-fill"></div></div>
+    <div class="gauge-sub">
+      <span id="fuel-laps-left">— laps left</span>
+      <span id="fuel-rate">— L/lap</span>
+    </div>
+  </div>
+
+  <!-- ERS / Hybrid (hidden when no ERS data) -->
+  <div class="section" id="ers-section" style="display:none">
+    <div class="gauge-hdr">
+      <div class="gauge-lbl">Virtual Energy</div>
+      <div class="gauge-vals">
+        <span class="gauge-main" id="ve-val">—</span><span class="gauge-unit">%</span>
+      </div>
+    </div>
+    <div class="gauge-bar"><div class="gauge-fill" id="ve-fill" style="background:var(--blue)"></div></div>
+    <div class="gauge-sub">
+      <span id="ve-laps-left">— laps left</span>
+      <span id="ve-rate">— %/lap</span>
+    </div>
+
+    <div style="margin-top:5px;">
+      <div class="gauge-hdr">
+        <div class="gauge-lbl">State of Charge</div>
+        <div class="gauge-vals">
+          <span class="gauge-main" id="soc-val">—</span><span class="gauge-unit">%</span>
+        </div>
+      </div>
+      <div class="gauge-bar"><div class="gauge-fill" id="soc-fill" style="background:var(--purple)"></div></div>
+    </div>
+
+    <div class="ers-grid" style="margin-top:5px;">
+      <div class="ers-cell">
+        <div class="ec-lbl">Regen</div>
+        <div class="ec-val" id="regen-val" style="color:var(--blue)">— <span style="font-size:10px;color:var(--muted)">kW</span></div>
+      </div>
+      <div class="ers-cell">
+        <div class="ec-lbl">VE / Lap</div>
+        <div class="ec-val" id="ve-per-lap">—%</div>
+      </div>
+    </div>
+
+    <div class="motor-state" id="motor-state">
+      <div class="motor-dot"></div>
+      <span id="motor-txt">INACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="foot">
+    <div class="k">Laps Left</div><div class="v" id="laps-left">—</div>
+    <div class="k">Limiting</div><div class="v" id="limit">—</div>
+    <div class="k">Fuel/Lap</div><div class="v" id="per-lap">—</div>
+    <div class="k">Capacity</div><div class="v" id="cap">—</div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+
+  function fuelColor(pct) {
+    if (pct == null) return 'var(--muted)';
+    if (pct < 10) return 'var(--red)';
+    if (pct < 25) return 'var(--amber)';
+    return 'var(--lime)';
+  }
+
+  const MOTOR_STATES = {
+    0: ['UNAVAILABLE',''],
+    1: ['INACTIVE',''],
+    2: ['PROPULSION','propulsion'],
+    3: ['REGENERATING','regen'],
+  };
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: (s) => {
+      const d  = s.driver || {};
+      const se = s.session || {};
+      const str = s.strategy || {};
+      const rp  = str.race_plan || {};
+      const st  = str.stint || {};
+
+      // FUEL
+      const fuelL = d.fuel_level ?? se.fuel_level ?? d.fuel;
+      const cap   = d.fuel_capacity ?? se.fuel_capacity;
+      const pct   = (fuelL != null && cap > 0) ? (fuelL / cap * 100) : null;
+
+      $('fuel-l').textContent  = fuelL != null ? fuelL.toFixed(1) : '—';
+      $('fuel-pct').textContent = pct != null ? pct.toFixed(0) + '%' : '—%';
+      $('fuel-fill').style.right = (pct == null ? 100 : (100-clamp(pct,0,100))) + '%';
+      $('fuel-fill').style.background = fuelColor(pct);
+
+      const fuelRate = rp.fuel_per_lap ?? d.fuel_per_lap ?? st.fuel_per_lap;
+      const fuelLaps = (fuelRate > 0 && fuelL != null) ? (fuelL / fuelRate) : null;
+      $('fuel-laps-left').textContent = fuelLaps != null ? fuelLaps.toFixed(1) + ' laps left' : '— laps left';
+      $('fuel-rate').textContent      = fuelRate != null ? fuelRate.toFixed(2) + ' L/lap' : '— L/lap';
+
+      // ERS / VE
+      const ve  = d.virtual_energy ?? d.virtual_energy_pct;
+      const soc = d.state_of_charge ?? d.battery_charge ?? d.battery_charge_fraction;
+      const regen = d.regen; // kW
+      const motorState = d.electric_boost_motor_state ?? d.motor_state;
+      const hasERS = ve != null || soc != null;
+
+      $('ers-section').style.display = hasERS ? '' : 'none';
+
+      if (hasERS) {
+        // Virtual energy (fraction or percent)
+        const veNorm = ve != null ? (ve > 1 ? ve : ve * 100) : null;
+        $('ve-val').textContent  = veNorm != null ? veNorm.toFixed(1) : '—';
+        $('ve-fill').style.right = (veNorm == null ? 100 : (100-clamp(veNorm,0,100))) + '%';
+        $('ve-fill').style.background = veNorm < 15 ? 'var(--red)' : (veNorm < 30 ? 'var(--amber)' : 'var(--blue)');
+        const veRate = rp.ve_per_lap ?? st.ve_per_lap;
+        const veLaps = (veRate > 0 && veNorm != null) ? (veNorm / veRate) : null;
+        $('ve-laps-left').textContent = veLaps != null ? veLaps.toFixed(1) + ' laps left' : '— laps left';
+        $('ve-rate').textContent = veRate != null ? veRate.toFixed(2) + ' %/lap' : '— %/lap';
+        $('ve-per-lap').textContent = veRate != null ? veRate.toFixed(2) + '%' : '—%';
+
+        // SoC
+        const socNorm = soc != null ? (soc > 1 ? soc : soc * 100) : null;
+        $('soc-val').textContent = socNorm != null ? socNorm.toFixed(1) : '—';
+        $('soc-fill').style.right = (socNorm == null ? 100 : (100-clamp(socNorm,0,100))) + '%';
+
+        // Regen
+        $('regen-val').innerHTML = regen != null
+          ? regen.toFixed(0) + ' <span style="font-size:10px;color:var(--muted)">kW</span>'
+          : '— <span style="font-size:10px;color:var(--muted)">kW</span>';
+
+        // Motor state
+        const [txt, cls] = MOTOR_STATES[motorState] ?? ['UNKNOWN', ''];
+        $('motor-txt').textContent = txt;
+        $('motor-state').className = 'motor-state ' + cls;
+      }
+
+      // Footer
+      $('laps-left').textContent = rp.laps_until_fuel != null ? rp.laps_until_fuel : (fuelLaps != null ? fuelLaps.toFixed(1) : '—');
+      $('limit').textContent     = rp.limiting_factor || (hasERS ? 'HYBRID' : 'FUEL');
+      $('per-lap').textContent   = fuelRate != null ? fuelRate.toFixed(2) + ' L' : '—';
+      $('cap').textContent       = cap != null ? cap.toFixed(0) + ' L' : '—';
+    }
+  });
+</script>
+</body>
+</html>

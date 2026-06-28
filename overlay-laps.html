@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Laps & Sectors</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  /* Position row */
+  .pos-lap-row {
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-bottom:4px;
+  }
+  .pos-big {
+    display:flex; align-items:baseline; gap:2px;
+    font-size:36px; font-weight:900; line-height:1;
+    color:var(--lime); letter-spacing:-1px;
+  }
+  .pos-big .sep { color:var(--muted); font-size:16px; font-weight:700; margin:0 2px; }
+  .pos-big .total { font-size:18px; color:var(--muted2); }
+  .lap-counter {
+    text-align:right;
+  }
+  .lap-counter .lbl {
+    font-size:9px; font-weight:900; letter-spacing:0.15em;
+    text-transform:uppercase; color:var(--muted); display:block;
+  }
+  .lap-counter .val {
+    font-size:18px; font-weight:900; font-variant-numeric:tabular-nums;
+  }
+  .lap-counter .sep { color:var(--muted); font-size:12px; }
+
+  /* Lap times section */
+  .times-block { margin-bottom:4px; }
+  .time-row {
+    display:grid; grid-template-columns:50px 1fr auto;
+    gap:4px 6px; align-items:center;
+    padding:3px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .time-row:last-child { border-bottom:none; }
+  .t-lbl { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .t-bar-wrap { height:3px; background:rgba(255,255,255,0.06); border-radius:1px; overflow:hidden; }
+  .t-bar { height:100%; width:0%; transition:width 0.3s; }
+  .t-val {
+    font-size:15px; font-weight:900; font-variant-numeric:tabular-nums;
+    text-align:right;
+  }
+  .t-val.cur  { color:#fff; }
+  .t-val.last { color:var(--muted2); }
+  .t-val.best { color:var(--lime); }
+
+  /* Sectors */
+  .sectors-title {
+    font-size:9px; font-weight:900; letter-spacing:0.18em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:4px;
+  }
+  .sectors-row {
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:3px;
+  }
+  .sector-box {
+    background:var(--bg2); border:1px solid var(--border2); border-radius:3px;
+    padding:4px 5px; display:flex; flex-direction:column; gap:1px;
+  }
+  .sector-box .s-num { font-size:8px; font-weight:900; color:var(--muted); letter-spacing:0.1em; }
+  .sector-box .s-time {
+    font-size:13px; font-weight:900; font-variant-numeric:tabular-nums;
+    color:var(--muted2);
+  }
+  .sector-box.s-best .s-time  { color:var(--lime); }
+  .sector-box.s-purple .s-time{ color:var(--purple); }
+  .sector-box.s-yellow .s-time{ color:var(--amber); }
+  .sector-box.s-active .s-num::after { content:' ●'; color:var(--lime); }
+  .sector-box .s-delta { font-size:9px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* Delta */
+  .delta-row {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:4px; padding-top:5px; border-top:1px solid var(--border2);
+  }
+  .delta-lbl { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .delta-val { font-size:24px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
+  .delta-val.pos { color:var(--red); }
+  .delta-val.neg { color:var(--green); }
+
+  /* Session time */
+  .session-row {
+    display:flex; align-items:center; gap:4px;
+    padding-top:4px; border-top:1px solid var(--border);
+  }
+  .stime-lbl { font-size:9px; font-weight:900; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); flex:1; }
+  .stime-val { font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; color:var(--muted2); }
+
+  /* Invalid lap */
+  .inval-banner {
+    display:none; text-align:center; padding:3px 6px; border-radius:3px;
+    font-size:9px; font-weight:900; letter-spacing:0.18em; text-transform:uppercase;
+    background:rgba(255,68,68,0.15); border:1px solid rgba(255,68,68,0.4); color:var(--red);
+    animation:inval-flash 0.9s ease-in-out infinite;
+  }
+  .inval-banner.on { display:block; }
+  @keyframes inval-flash { 50% { opacity:0.5; } }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Laps &amp; Sectors</div>
+    <div class="dot" id="dot"></div>
+  </div>
+
+  <!-- Lap invalid warning -->
+  <div class="inval-banner" id="inval">⚠ LAP INVALIDATED</div>
+
+  <!-- Position / Lap -->
+  <div class="pos-lap-row">
+    <div class="pos-big">
+      <span id="pos">—</span>
+      <span class="sep">/</span>
+      <span class="total" id="pos-total">—</span>
+    </div>
+    <div class="lap-counter">
+      <span class="lbl">Lap</span>
+      <span class="val"><span id="lap">—</span><span class="sep">/</span><span id="lap-total">—</span></span>
+    </div>
+  </div>
+
+  <!-- Lap times -->
+  <div class="times-block">
+    <div class="time-row">
+      <div class="t-lbl">Current</div>
+      <div class="t-bar-wrap"><div class="t-bar" id="cur-bar" style="background:rgba(255,255,255,0.25)"></div></div>
+      <div class="t-val cur" id="cur">—:——.———</div>
+    </div>
+    <div class="time-row">
+      <div class="t-lbl">Last</div>
+      <div class="t-bar-wrap"><div class="t-bar" id="last-bar" style="background:var(--muted)"></div></div>
+      <div class="t-val last" id="last">—:——.———</div>
+    </div>
+    <div class="time-row">
+      <div class="t-lbl">Best</div>
+      <div class="t-bar-wrap"><div class="t-bar" id="best-bar" style="background:var(--lime)"></div></div>
+      <div class="t-val best" id="best">—:——.———</div>
+    </div>
+  </div>
+
+  <!-- Sector times -->
+  <div class="sectors-title">Sector Times</div>
+  <div class="sectors-row">
+    <div class="sector-box" id="s1">
+      <div class="s-num">S1</div>
+      <div class="s-time" id="s1-time">—.———</div>
+      <div class="s-delta" id="s1-delta"></div>
+    </div>
+    <div class="sector-box" id="s2">
+      <div class="s-num">S2</div>
+      <div class="s-time" id="s2-time">—.———</div>
+      <div class="s-delta" id="s2-delta"></div>
+    </div>
+    <div class="sector-box" id="s3">
+      <div class="s-num">S3</div>
+      <div class="s-time" id="s3-time">—.———</div>
+      <div class="s-delta" id="s3-delta"></div>
+    </div>
+  </div>
+
+  <!-- Delta vs best -->
+  <div class="delta-row">
+    <div class="delta-lbl">Δ Best</div>
+    <div class="delta-val" id="delta">—</div>
+  </div>
+
+  <!-- Session time remaining -->
+  <div class="session-row">
+    <div class="stime-lbl">Session left</div>
+    <div class="stime-val" id="stime">—:——</div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  function fmtLap(v) {
+    if (v == null || isNaN(v) || v <= 0) return '—:——.———';
+    const m = Math.floor(v / 60);
+    const s = (v % 60).toFixed(3).padStart(6,'0');
+    return m + ':' + s;
+  }
+
+  function fmtSec(v) {
+    if (v == null || isNaN(v) || v <= 0) return '—.———';
+    return v.toFixed(3);
+  }
+
+  function fmtTime(secs) {
+    if (secs == null || isNaN(secs) || secs < 0) return '—:——';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    return m + ':' + String(s).padStart(2,'0');
+  }
+
+  function fmtDelta(v) {
+    if (v == null || isNaN(v)) return '—';
+    return (v > 0 ? '+' : '') + v.toFixed(3);
+  }
+
+  function lapToBarPct(cur, best) {
+    if (!cur || !best || best <= 0) return 0;
+    return Math.min(100, (cur / best) * 100);
+  }
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: (s) => {
+      const d = s.driver || {}, se = s.session || {}, st = s.standings || [];
+      const myPos = d.position ?? se.position;
+      const numCars = st.length || se.num_cars;
+
+      // Lap invalid
+      const invalid = d.lap_invalidated === true || d.lap_invalidated === 1 || se.lap_invalidated;
+      $('inval').className = 'inval-banner' + (invalid ? ' on' : '');
+
+      // Position + lap
+      $('pos').textContent = myPos ?? '—';
+      $('pos-total').textContent = numCars ?? '—';
+      $('lap').textContent = se.lap_number ?? '—';
+      $('lap-total').textContent = se.total_laps ?? '—';
+
+      // Lap times
+      const curT  = d.current_lap_time ?? se.current_lap_time;
+      const lastT = d.last_lap_time    ?? se.last_lap_time;
+      const bestT = d.best_lap_time    ?? se.best_lap_time;
+      $('cur').textContent  = fmtLap(curT);
+      $('last').textContent = fmtLap(lastT);
+      $('best').textContent = fmtLap(bestT);
+
+      // Bar widths relative to best
+      if (bestT > 0) {
+        $('cur-bar').style.width  = lapToBarPct(curT, bestT) + '%';
+        $('last-bar').style.width = lapToBarPct(lastT, bestT) + '%';
+        $('best-bar').style.width = '100%';
+      }
+      // Color last lap vs best
+      if (lastT && bestT) {
+        const diff = lastT - bestT;
+        $('last').style.color = diff <= 0 ? 'var(--lime)' : (diff < 0.3 ? 'var(--amber)' : 'var(--muted2)');
+      }
+
+      // Sector times
+      const curS = se.current_sector ?? d.current_sector ?? 0;
+      // Current sector times
+      const cs1  = d.cur_sector1 ?? se.cur_sector1;
+      const cs2raw = d.cur_sector2 ?? se.cur_sector2;
+      const cs2  = cs2raw && cs1 ? cs2raw - cs1 : cs2raw;
+      // Best sector times (from best lap)
+      const bs1  = d.best_sector1 ?? se.best_sector1;
+      const bs2raw = d.best_sector2 ?? se.best_sector2;
+      const bs2  = bs2raw && bs1 ? bs2raw - bs1 : bs2raw;
+      // Last sector times
+      const ls1  = d.last_sector1 ?? se.last_sector1;
+      const ls2raw = d.last_sector2 ?? se.last_sector2;
+      const ls2  = ls2raw && ls1 ? ls2raw - ls1 : ls2raw;
+      const ls3  = (lastT && ls2raw) ? lastT - ls2raw : null;
+      const bs3  = (bestT && bs2raw) ? bestT - bs2raw : null;
+
+      // Determine which sector is active (1-indexed: 0=s3, 1=s1, 2=s2 per LMU convention)
+      const lmuSector = se.game_sector ?? d.game_sector;
+      // Render each sector box
+      function renderSector(idx, time, best, isActive) {
+        const box = $('s' + (idx+1));
+        const tEl = $('s' + (idx+1) + '-time');
+        const dEl = $('s' + (idx+1) + '-delta');
+        tEl.textContent = fmtSec(time);
+        box.className = 'sector-box' + (isActive ? ' s-active' : '');
+        let cls = '';
+        if (time != null && best != null) {
+          const diff = time - best;
+          if (diff <= 0)    { cls = 's-best'; dEl.textContent = fmtDelta(diff); dEl.style.color='var(--lime)'; }
+          else if (diff < 0.1) { cls = 's-yellow'; dEl.textContent = '+'+diff.toFixed(3); dEl.style.color='var(--amber)'; }
+          else              { cls = ''; dEl.textContent = '+'+diff.toFixed(3); dEl.style.color='var(--red)'; }
+        } else { dEl.textContent=''; }
+        if (isActive && time == null) tEl.style.color='var(--lime)';
+        else box.className += (cls ? ' ' + cls : '');
+      }
+      renderSector(0, ls1 ?? cs1, bs1, curS === 1);
+      renderSector(1, ls2 ?? cs2, bs2, curS === 2);
+      renderSector(2, ls3,        bs3, curS === 0);
+
+      // Delta vs best
+      const dv = se.delta_best ?? d.delta_best;
+      const dEl = $('delta');
+      dEl.textContent = fmtDelta(dv);
+      dEl.className = 'delta-val' + (dv == null ? '' : (dv > 0 ? ' pos' : ' neg'));
+
+      // Session time remaining
+      const remaining = se.session_time_remaining ?? se.time_remaining;
+      $('stime').textContent = fmtTime(remaining);
+    }
+  });
+</script>
+</body>
+</html>

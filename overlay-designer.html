@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Overlay Layout — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #111111;
+  --sidebar:    #161616;
+  --card:       #222222;
+  --card-hover: #2a2a2a;
+  --green:      #A3E635;
+  --green-dark: #4d7c0f;
+  --text:       #FFFFFF;
+  --muted:      #A1A1AA;
+  --border:     #333333;
+  --red:        #EF4444;
+  --orange:     #D97706;
+  --lime:       #A3E635;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select { font-family: inherit; color: inherit; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ── APP SHELL ── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+  height: 60px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.topbar-title .accent { color: var(--green); }
+
+.topbar-spacer { flex: 1; }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--muted);
+  background: transparent;
+  transition: all 0.2s;
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.status-pill.is-saved { border-color: rgba(163,230,53,0.4); color: var(--green); }
+.status-pill.is-saved .status-dot { background: var(--green); box-shadow: 0 0 8px rgba(163,230,53,0.6); }
+.status-pill.is-dirty { border-color: rgba(239,68,68,0.4); color: var(--red); }
+.status-pill.is-dirty .status-dot { background: var(--red); }
+
+.hw-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--muted);
+  background: transparent;
+  transition: all 0.2s;
+}
+.hw-pill.active { border-color: rgba(163,230,53,0.4); color: var(--green); }
+.hw-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+.hw-pill.active .hw-dot { opacity: 1; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: var(--text);
+  transition: all 0.2s;
+}
+.btn:hover { background: rgba(255,255,255,0.08); border-color: var(--green); color: var(--green); }
+.btn.is-active { border-color: var(--green); color: var(--green); background: rgba(163,230,53,0.1); }
+.btn.primary { background: var(--green); color: #000; border-color: var(--green); }
+.btn.primary:hover { background: #b0f040; color: #000; border-color: #b0f040; transform: scale(1.02); }
+
+/* ── WORKSPACE ── */
+.workspace {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.section-head-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.section-head-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.section-head-count.lit { color: var(--green); }
+
+/* Overlay list */
+.overlay-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  min-height: 0;
+}
+
+.ov-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.ov-row:hover { background: var(--card-hover); }
+.ov-row.is-selected {
+  background: rgba(163,230,53,0.08);
+  border-color: rgba(163,230,53,0.25);
+}
+
+.ov-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.ov-row.is-selected .ov-icon {
+  background: rgba(163,230,53,0.12);
+  border-color: rgba(163,230,53,0.35);
+}
+
+.ov-info { flex: 1; min-width: 0; }
+.ov-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.ov-row.is-selected .ov-name { color: var(--green); }
+
+.ov-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+}
+.ov-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.ov-chip.pages {
+  color: var(--green);
+  background: rgba(163,230,53,0.08);
+  border-color: rgba(163,230,53,0.25);
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  width: 32px; height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.toggle input { opacity: 0; position: absolute; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  border-radius: 9px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.toggle input:checked + .toggle-track { background: var(--green); }
+.toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: all 0.15s;
+  pointer-events: none;
+}
+.toggle input:checked ~ .toggle-thumb { left: 16px; background: #000; }
+
+/* Hotkeys */
+.hotkeys-section { border-top: 1px solid var(--border); flex-shrink: 0; }
+.hotkeys-inner { padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+
+.hk-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 10px;
+  transition: background 0.12s;
+}
+.hk-row:hover { background: var(--card-hover); }
+.hk-row.is-listening {
+  background: rgba(163,230,53,0.08);
+  border-radius: 10px;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.55; } }
+
+.hk-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hk-row.is-listening .hk-label { color: var(--green); font-weight: 700; }
+
+.hk-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+  background: var(--card);
+  min-width: 44px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.hk-chip.bound { border-color: rgba(163,230,53,0.35); color: var(--green); background: rgba(163,230,53,0.08); }
+.hk-chip.listening { background: var(--green); border-color: var(--green); color: #000; }
+
+.hk-actions { display: flex; gap: 3px; }
+.hk-btn {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.hk-btn.assign:hover { border-color: var(--green); color: var(--green); background: rgba(163,230,53,0.1); }
+.hk-btn.clear:hover  { border-color: var(--red);   color: var(--red);   background: rgba(239,68,68,0.1); }
+
+/* Panel bottom controls */
+.panel-footer {
+  border-top: 1px solid var(--border);
+  padding: 10px 8px;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.panel-footer .btn { flex: 1; justify-content: center; font-size: 11px; padding: 7px 10px; }
+
+/* ── RIGHT AREA ── */
+.right-area {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  min-width: 0; min-height: 0;
+  overflow: hidden;
+}
+
+/* ── PREVIEW PANEL ── */
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.panel-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.select {
+  appearance: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  transition: border-color 0.15s;
+}
+.select:focus { outline: none; border-color: var(--green); }
+
+.move-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  transition: all 0.15s;
+}
+.move-btn:hover { border-color: var(--green); color: var(--green); background: rgba(163,230,53,0.08); }
+
+/* HUD layer tags */
+.hud-tags { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.hud-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.hud-tag-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: all 0.15s; }
+.hud-tag.on { border-color: rgba(163,230,53,0.4); color: var(--green); }
+.hud-tag.on .hud-tag-dot { background: var(--green); box-shadow: 0 0 6px rgba(163,230,53,0.5); }
+
+.res-label {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* Canvas */
+.canvas-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-screen {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+  border-radius: 4px;
+}
+.preview-screen img.hud {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.preview-screen img.hud.off { opacity: 0; }
+
+/* Widget boxes */
+.widget-box {
+  position: absolute;
+  background: rgba(163,230,53,0.07);
+  border: 1px solid rgba(163,230,53,0.4);
+  border-radius: 3px;
+  cursor: grab;
+  transition: border-color 0.12s, background 0.12s;
+}
+.widget-box:hover { background: rgba(163,230,53,0.12); border-color: rgba(163,230,53,0.7); }
+.widget-box.selected {
+  background: rgba(163,230,53,0.15);
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px rgba(163,230,53,0.2);
+  z-index: 10;
+}
+.widget-box .label {
+  position: absolute;
+  top: -19px; left: -1px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--green);
+  color: #000;
+  padding: 2px 6px;
+  border-radius: 3px 3px 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.widget-box.selected .label { background: #fff; }
+.widget-box .handle {
+  position: absolute;
+  right: -5px; bottom: -5px;
+  width: 12px; height: 12px;
+  background: var(--green);
+  border: 1.5px solid #000;
+  border-radius: 3px;
+  cursor: nwse-resize;
+}
+.widget-box.dragging { cursor: grabbing; opacity: 0.8; }
+
+/* ── SETTINGS PANEL ── */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.selected-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  overflow: hidden;
+}
+
+/* Left col: preview + coords */
+.settings-left {
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--sidebar);
+  overflow-y: auto;
+}
+
+.col-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.preview-frame {
+  flex: 1;
+  min-height: 120px;
+  background: #000;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-frame iframe { border: 0; background: transparent; pointer-events: none; }
+
+/* Coords */
+.coords-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.coord-field { display: flex; flex-direction: column; gap: 3px; }
+.coord-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.coord-input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.coord-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(163,230,53,0.12); }
+
+.ratio-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.ratio-row .coord-input { width: 80px; }
+.ratio-lock {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ratio-lock.locked { color: var(--green); }
+
+/* Right col: info cards */
+.settings-right {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.info-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.info-card-head {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.info-card-body { padding: 16px 18px; }
+
+/* KV table */
+.kv-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px 18px;
+  align-items: center;
+}
+.kv-key {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.kv-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+}
+.kv-val.live { color: var(--green); }
+.kv-val.dim  { color: var(--muted); }
+.kv-val select.inline-select {
+  appearance: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Barlow', sans-serif;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.kv-val select.inline-select:focus { outline: none; border-color: var(--green); }
+
+/* Quick actions */
+.quick-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.qa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  transition: all 0.2s;
+}
+.qa-btn:hover { border-color: var(--green); color: var(--green); background: rgba(163,230,53,0.08); }
+
+.pages-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(163,230,53,0.35);
+  background: rgba(163,230,53,0.08);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hint-text {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.hint-text strong { color: var(--green); font-weight: 700; }
+.hint-text em { color: var(--text); font-style: normal; }
+
+/* Empty state */
+.empty-state {
+  flex: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+  padding: 40px;
+  text-align: center;
+}
+.empty-state svg { opacity: 0.2; }
+.empty-state p { font-size: 13px; line-height: 1.6; }
+
+/* Sidebar.js override */
+#app-sidebar {
+  --sb-bg:     #0e0e0e;
+  --sb-border: #1e1e1e;
+}
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+
+<aside id="app-sidebar"></aside>
+
+<div class="app-shell">
+
+  <!-- ── TOPBAR ── -->
+  <header class="topbar">
+    <div class="topbar-title">Overlay <span class="accent">Layout</span></div>
+
+    <div class="status-pill is-saved" id="status">
+      <span class="status-dot"></span>
+      <span id="status-lbl">Ready</span>
+    </div>
+
+    <div class="hw-pill" id="hw-status" title="Dernier input hardware reçu">
+      <span class="hw-dot"></span>
+      <span id="hw-status-lbl">No HW input</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <button class="btn" id="btn-reset">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.02"/></svg>
+      Reload
+    </button>
+    <button class="btn" id="btn-edit-toggle">Edit Mode</button>
+    <button class="btn" id="btn-show-toggle">Show</button>
+    <button class="btn primary" id="btn-save">Save Bindings</button>
+    <button class="btn" onclick="window.close()">Close</button>
+  </header>
+
+  <!-- ── WORKSPACE ── -->
+  <div class="workspace">
+
+    <!-- LEFT: Overlays + Hotkeys -->
+    <aside class="left-panel">
+
+      <div class="section-head">
+        <span class="section-head-title">Overlays</span>
+        <span class="section-head-count" id="overlay-count">—</span>
+      </div>
+
+      <div class="overlay-list" id="side-list"></div>
+
+      <div class="hotkeys-section">
+        <div class="section-head" style="border-top: 1px solid var(--border);">
+          <span class="section-head-title">Global Hotkeys</span>
+          <span class="section-head-count" id="hk-status">0/5</span>
+        </div>
+        <div class="hotkeys-inner" id="global-hotkeys"></div>
+      </div>
+
+      <div class="panel-footer">
+        <button class="btn" id="btn-edit-toggle-2">Edit Mode</button>
+        <button class="btn" id="btn-show-toggle-2">Show Now</button>
+      </div>
+    </aside>
+
+    <!-- RIGHT: Preview + Settings -->
+    <div class="right-area">
+
+      <!-- TOP: Preview -->
+      <section class="preview-panel">
+        <div class="panel-toolbar">
+          <span class="panel-label">In-Game Preview</span>
+          <select class="select" id="screen-select" title="Target display"></select>
+          <button id="move-all-here" class="move-btn" title="Move every enabled overlay to this display">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            Move all here
+          </button>
+          <div class="hud-tags" id="hud-toggles"></div>
+          <span class="res-label" id="res-info"></span>
+        </div>
+        <div class="canvas-area">
+          <div class="preview-screen" id="preview-screen"></div>
+        </div>
+      </section>
+
+      <!-- BOTTOM: Settings -->
+      <section class="settings-panel">
+        <div class="settings-topbar">
+          <span class="section-head-title">Widget Settings</span>
+          <span class="selected-name" id="selected-name">—</span>
+        </div>
+        <div class="settings-body" id="settings-body">
+          <!-- populated dynamically -->
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Overlay Layout Designer — same logic, UI aligned to main.html ── */
+
+const HK_ACTIONS = [
+  { k: 'toggleShow', lbl: 'Toggle Show / Hide' },
+  { k: 'focusNext',  lbl: 'Focus Next →' },
+  { k: 'focusPrev',  lbl: 'Focus Prev ←' },
+  { k: 'pageNext',   lbl: 'Page Next →' },
+  { k: 'pagePrev',   lbl: 'Page Prev ←' },
+];
+
+const PAGED_OVERLAYS = {
+  'overlay-delta':     2,
+  'overlay-weather':   2,
+  'overlay-stint':     5,
+  'overlay-standings': 4,
+};
+
+const OV_ICON = { delta:'△', weather:'☁', stint:'⏱', standings:'🏆', map:'◉', tyre:'◎', fuel:'⚡' };
+function ovEmoji(type) {
+  const k = (type || '').replace('overlay-', '');
+  return OV_ICON[k] || '⊡';
+}
+
+const state = {
+  widgets: [], displays: [], selectedId: null,
+  previewDisplayIdx: 0, hudLayers: [],
+  hotkeys: { toggleShow:null, focusNext:null, focusPrev:null, pageNext:null, pagePrev:null },
+  editMode: false, forceShow: false, dirty: false, listeningAction: null,
+};
+
+const $ = id => document.getElementById(id);
+
+// ── INIT ──────────────────────────────────────────────────────────
+async function init() {
+  if (typeof renderSidebar === 'function') renderSidebar('layout-designer', 'main');
+  if (!window.electronAPI?.overlays) { alert('electronAPI missing'); return; }
+
+  const ov = window.electronAPI.overlays;
+  const s  = await ov.getState();
+  state.widgets  = s.widgets  || [];
+  state.displays = s.displays || [];
+  state.editMode  = !!s.editMode;
+  state.forceShow = !!s.forceShow;
+
+  const first = state.widgets.find(w => w.enabled !== false);
+  state.previewDisplayIdx = first ? (first.displayIndex || 0) : 0;
+
+  const assets = await ov.listHudAssets();
+  const bg     = assets.find(a => a.key === 'background');
+  const others = assets.filter(a => a.key !== 'background').sort((a,b) => a.key.localeCompare(b.key));
+  state.hudLayers = [
+    ...(bg ? [{ ...bg, enabled: true, locked: true }] : []),
+    ...others.map(a => ({ ...a, enabled: true })),
+  ];
+
+  try {
+    const hk = await ov.hotkeysGet();
+    if (hk && typeof hk === 'object' && !Array.isArray(hk))
+      for (const a of HK_ACTIONS) state.hotkeys[a.k] = hk[a.k] || null;
+  } catch(_) {}
+
+  if (!state.editMode) { ov.setEditMode(true); state.editMode = true; }
+
+  if (ov.onHwInput) {
+    ov.onHwInput(data => { flashHwIndicator(data); onHwInput(data); });
+  }
+  window.addEventListener('keydown', ev => {
+    if (!state.listeningAction) return;
+    if (ev.key >= '0' && ev.key <= '9') { ev.preventDefault(); onHwInput({ joy_id:0, button_id: parseInt(ev.key,10) }); }
+    else if (ev.key === 'Escape') stopAssign(true);
+  });
+
+  renderAll();
+  bindTopbar();
+}
+
+// ── RENDER CYCLE ─────────────────────────────────────────────────
+function renderAll() {
+  renderSidebarList();
+  renderGlobalHotkeys();
+  renderScreenSelect();
+  renderHudToggles();
+  renderPreview();
+  renderSettings();
+  renderTopbarState();
+}
+
+function markDirty(on = true) {
+  state.dirty = on;
+  $('status').className = 'status-pill ' + (on ? 'is-dirty' : 'is-saved');
+  $('status-lbl').textContent = on ? 'Unsaved' : 'Ready';
+}
+
+function renderTopbarState() {
+  const pairs = [['btn-edit-toggle','btn-edit-toggle-2'], ['btn-show-toggle','btn-show-toggle-2']];
+  const editLabel = state.editMode  ? 'Edit: On' : 'Edit Mode';
+  const showLabel = state.forceShow ? 'Show: On' : 'Show Now';
+  $('btn-edit-toggle').textContent  = state.editMode  ? 'Edit: On' : 'Edit Mode';
+  $('btn-show-toggle').textContent  = state.forceShow ? 'Show: On' : 'Show';
+  $('btn-edit-toggle-2').textContent = editLabel;
+  $('btn-show-toggle-2').textContent = showLabel;
+  ['btn-edit-toggle','btn-edit-toggle-2'].forEach(id => $( id)?.classList.toggle('is-active', state.editMode));
+  ['btn-show-toggle','btn-show-toggle-2'].forEach(id => $(id)?.classList.toggle('is-active', state.forceShow));
+}
+
+// ── OVERLAY LIST ─────────────────────────────────────────────────
+function prettyName(w) {
+  return (w.id || '').replace(/^overlay-/i,'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function renderSidebarList() {
+  const list = $('side-list');
+  list.innerHTML = '';
+  $('overlay-count').textContent = state.widgets.length;
+
+  for (const w of state.widgets) {
+    const row = document.createElement('div');
+    row.className = 'ov-row' + (w.id === state.selectedId ? ' is-selected' : '');
+    const pages = PAGED_OVERLAYS[w.type];
+    const pageBadge = pages ? `<span class="ov-chip pages">⊞ ${pages}p</span>` : '';
+    row.innerHTML = `
+      <div class="ov-icon">${ovEmoji(w.type)}</div>
+      <div class="ov-info">
+        <div class="ov-name">${prettyName(w)}</div>
+        <div class="ov-meta">
+          <span class="ov-chip">D${(w.displayIndex ?? 0)+1}</span>${pageBadge}
+        </div>
+      </div>
+      <label class="toggle" title="Enable">
+        <input type="checkbox" ${w.enabled !== false ? 'checked' : ''}>
+        <span class="toggle-track"></span>
+        <span class="toggle-thumb"></span>
+      </label>`;
+    row.addEventListener('click', e => {
+      if (e.target.closest('.toggle')) return;
+      state.selectedId = w.id;
+      if (typeof w.displayIndex === 'number') state.previewDisplayIdx = w.displayIndex;
+      renderAll();
+    });
+    row.querySelector('input[type=checkbox]').addEventListener('change', async e => {
+      e.stopPropagation();
+      const en = e.target.checked;
+      await window.electronAPI.overlays.setEnabled(w.id, en);
+      w.enabled = en;
+      renderSidebarList(); renderPreview();
+    });
+    list.appendChild(row);
+  }
+}
+
+// ── HOTKEYS ──────────────────────────────────────────────────────
+function renderGlobalHotkeys() {
+  const host = $('global-hotkeys');
+  if (!host) return;
+  host.innerHTML = '';
+  for (const a of HK_ACTIONS) {
+    const b   = state.hotkeys[a.k];
+    const lis = state.listeningAction === a.k;
+    const row = document.createElement('div');
+    row.className = 'hk-row' + (lis ? ' is-listening' : '');
+    const chipCls = lis ? 'hk-chip listening' : (b ? 'hk-chip bound' : 'hk-chip');
+    const chipTxt = lis ? '⌛' : (b ? `J${b.joy_id}·B${b.button_id}` : '—');
+    row.innerHTML = `
+      <span class="hk-label">${a.lbl}</span>
+      <span class="${chipCls}">${chipTxt}</span>
+      <span class="hk-actions">
+        <button class="hk-btn assign" title="${lis ? 'Annuler' : 'Assigner'}">${lis ? '✕' : '⧉'}</button>
+        ${b ? `<button class="hk-btn clear" title="Supprimer">—</button>` : ''}
+      </span>`;
+    row.querySelector('.hk-btn.assign').onclick = () =>
+      state.listeningAction === a.k ? stopAssign(true) : startAssign(a.k);
+    const clr = row.querySelector('.hk-btn.clear');
+    if (clr) clr.onclick = () => { state.hotkeys[a.k] = null; markDirty(true); renderGlobalHotkeys(); };
+    host.appendChild(row);
+  }
+  const n = HK_ACTIONS.filter(a => state.hotkeys[a.k]).length;
+  $('hk-status').textContent = `${n}/5`;
+  $('hk-status').className = 'section-head-count' + (n === 5 ? ' lit' : '');
+}
+
+// ── SCREEN SELECT + HUD ──────────────────────────────────────────
+function renderScreenSelect() {
+  const sel = $('screen-select');
+  sel.innerHTML = '';
+  for (const d of state.displays) {
+    const opt = document.createElement('option');
+    opt.value = d.index;
+    opt.textContent = `Display ${d.index+1} — ${d.bounds.width}×${d.bounds.height}${d.primary?' ★':''}`;
+    if (d.index === state.previewDisplayIdx) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.onchange = () => { state.previewDisplayIdx = +sel.value; renderPreview(); };
+  const d = state.displays[state.previewDisplayIdx];
+  $('res-info').textContent = d ? `${d.bounds.width}×${d.bounds.height}` : '';
+
+  const mb = $('move-all-here');
+  if (mb) mb.onclick = async () => {
+    const t = state.previewDisplayIdx;
+    const moved = [];
+    for (const w of state.widgets) {
+      if (w.enabled === false || (w.displayIndex||0) === t) continue;
+      w.displayIndex = t; moved.push(w);
+    }
+    if (!moved.length) return;
+    await Promise.all(moved.map(w => window.electronAPI.overlays.updateBounds(w.id, { displayIndex:w.displayIndex, x:w.x, y:w.y, w:w.w, h:w.h })));
+    renderAll();
+  };
+}
+
+function renderHudToggles() {
+  const host = $('hud-toggles');
+  host.innerHTML = '';
+  for (const layer of state.hudLayers) {
+    const tag = document.createElement('span');
+    tag.className = 'hud-tag' + (layer.enabled ? ' on' : '');
+    tag.innerHTML = `<span class="hud-tag-dot"></span>${layer.key}`;
+    if (layer.locked) tag.title = 'Background (always on)';
+    tag.onclick = () => { if (layer.locked) return; layer.enabled = !layer.enabled; renderHudToggles(); renderPreview(); };
+    host.appendChild(tag);
+  }
+}
+
+// ── PREVIEW ──────────────────────────────────────────────────────
+function renderPreview() {
+  const host = $('preview-screen');
+  host.innerHTML = '';
+  const disp = state.displays[state.previewDisplayIdx];
+  if (!disp) { host.style.display='none'; return; }
+  host.style.display = '';
+
+  const wrap = host.parentElement;
+  const pad = 24;
+  const maxW = wrap.clientWidth - pad*2, maxH = wrap.clientHeight - pad*2;
+  const ar = disp.bounds.width / disp.bounds.height;
+  let w = maxW, h = w/ar;
+  if (h > maxH) { h = maxH; w = h*ar; }
+  host.style.width = w+'px'; host.style.height = h+'px';
+  const scale = w / disp.bounds.width;
+
+  for (const layer of state.hudLayers) {
+    const img = document.createElement('img');
+    img.className = 'hud' + (layer.enabled ? '' : ' off');
+    img.src = `assets/overlay/${layer.file}`;
+    img.draggable = false;
+    host.appendChild(img);
+  }
+  for (const widget of state.widgets) {
+    if ((widget.displayIndex||0) !== state.previewDisplayIdx) continue;
+    if (widget.enabled === false) continue;
+    const box = document.createElement('div');
+    box.className = 'widget-box' + (widget.id === state.selectedId ? ' selected' : '');
+    box.style.left   = (widget.x*scale)+'px';
+    box.style.top    = (widget.y*scale)+'px';
+    box.style.width  = (widget.w*scale)+'px';
+    box.style.height = (widget.h*scale)+'px';
+    box.innerHTML = `<div class="label">${widget.id}</div><div class="handle"></div>`;
+    box.addEventListener('mousedown', e => { if (e.target.classList.contains('handle')) return; startDrag(e, widget, box, scale); });
+    box.querySelector('.handle').addEventListener('mousedown', e => startResize(e, widget, box, scale));
+    box.addEventListener('click', e => { e.stopPropagation(); state.selectedId = widget.id; renderAll(); });
+    host.appendChild(box);
+  }
+}
+
+// ── DRAG & RESIZE ─────────────────────────────────────────────────
+function startDrag(e, widget, box, scale) {
+  e.preventDefault(); box.classList.add('dragging');
+  const sx=e.clientX, sy=e.clientY, ox=widget.x, oy=widget.y;
+  const mv = ev => { widget.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/scale)); widget.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/scale)); box.style.left=(widget.x*scale)+'px'; box.style.top=(widget.y*scale)+'px'; };
+  const up = () => { document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); box.classList.remove('dragging'); commitBounds(widget); };
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function startResize(e, widget, box, scale) {
+  e.preventDefault(); e.stopPropagation();
+  const sx=e.clientX, sy=e.clientY, ow=widget.w, oh=widget.h;
+  const ratio=(widget.ratio&&widget.ratio>0)?widget.ratio:(ow/oh);
+  const mv = ev => { const dx=(ev.clientX-sx)/scale,dy=(ev.clientY-sy)/scale; let nw,nh; if(Math.abs(dx)>=Math.abs(dy)){nw=Math.max(40,Math.round(ow+dx));nh=Math.round(nw/ratio);}else{nh=Math.max(30,Math.round(oh+dy));nw=Math.round(nh*ratio);} widget.w=nw;widget.h=nh;box.style.width=(widget.w*scale)+'px';box.style.height=(widget.h*scale)+'px'; };
+  const up = () => { document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); commitBounds(widget); };
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function commitBounds(widget) {
+  window.electronAPI.overlays.updateBounds(widget.id, { displayIndex:widget.displayIndex, x:widget.x, y:widget.y, w:widget.w, h:widget.h });
+  renderSettings();
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────
+function renderSettings() {
+  const host = $('settings-body');
+  const w    = state.widgets.find(x => x.id === state.selectedId);
+  $('selected-name').textContent = w ? prettyName(w) : '—';
+
+  if (!w) {
+    host.innerHTML = `
+      <div class="empty-state">
+        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M9 9h6M9 12h6M9 15h4"/>
+        </svg>
+        <p>Select an overlay on the left to configure it.</p>
+      </div>`;
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="settings-left">
+      <div class="col-label">Preview</div>
+      <div class="preview-frame" id="preview-frame"></div>
+
+      <div>
+        <div class="col-label" style="margin-bottom:10px">Position &amp; Size</div>
+        <div class="coords-grid">
+          <div class="coord-field"><span class="coord-label">X</span><input class="coord-input" type="number" id="coord-x" value="${w.x}"></div>
+          <div class="coord-field"><span class="coord-label">Y</span><input class="coord-input" type="number" id="coord-y" value="${w.y}"></div>
+          <div class="coord-field"><span class="coord-label">W</span><input class="coord-input" type="number" id="coord-w" value="${w.w}"></div>
+          <div class="coord-field"><span class="coord-label">H</span><input class="coord-input" type="number" id="coord-h" value="${w.h}"></div>
+        </div>
+        <div class="ratio-row" style="margin-top:10px">
+          <span class="coord-label">Ratio</span>
+          <input class="coord-input" type="number" id="coord-ratio" step="0.01" value="${(w.ratio ?? (w.w/w.h)).toFixed(2)}">
+          <span class="ratio-lock ${w.ratio ? 'locked' : ''}" id="ratio-lock-note">${w.ratio ? 'Locked' : 'Free'}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-right">
+      <div class="info-card">
+        <div class="info-card-head">Position &amp; Display</div>
+        <div class="info-card-body">
+          <div class="kv-grid">
+            <span class="kv-key">Type</span>
+            <span class="kv-val">${w.type}</span>
+            <span class="kv-key">Display</span>
+            <span class="kv-val">
+              <select class="inline-select" id="widget-display">
+                ${state.displays.map(d => `<option value="${d.index}" ${d.index===(w.displayIndex||0)?'selected':''}>D${d.index+1} — ${d.bounds.width}×${d.bounds.height}${d.primary?' ★':''}</option>`).join('')}
+              </select>
+            </span>
+            <span class="kv-key">Enabled</span>
+            <span class="kv-val ${w.enabled===false?'dim':''}">${w.enabled===false?'No':'Yes'}</span>
+            <span class="kv-key">Running</span>
+            <span class="kv-val ${w.running?'live':'dim'}">${w.running?'Live':'—'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-head">Quick Actions</div>
+        <div class="info-card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div class="quick-actions">
+            <button class="qa-btn" id="focus-this">🎯 Focus</button>
+            <button class="qa-btn" id="cycle-this">↻ Cycle Page</button>
+            ${PAGED_OVERLAYS[w.type]
+              ? `<span class="pages-badge">⊞ ${PAGED_OVERLAYS[w.type]} pages</span>`
+              : `<span style="font-size:11px;color:var(--muted)">Single page</span>`}
+          </div>
+          <p class="hint-text">
+            Bindings are <strong>global</strong> — configure them in the hotkeys panel on the left.
+            Use <em>Focus Next / Prev</em> to select which overlay the page buttons affect.
+          </p>
+        </div>
+      </div>
+    </div>`;
+
+  // iframe preview
+  const frame  = $('preview-frame');
+  const iframe = document.createElement('iframe');
+  iframe.src   = `${w.type}.html?preview=1`;
+  iframe.style.cssText = `width:${w.w}px;height:${w.h}px;transform-origin:top left;position:absolute;border:0`;
+  frame.appendChild(iframe);
+  requestAnimationFrame(() => {
+    const fw=frame.clientWidth||280, fh=frame.clientHeight||160;
+    const sc = Math.min(fw/w.w, fh/w.h)*0.94;
+    iframe.style.transform=`scale(${sc})`;
+    iframe.style.left=Math.max(0,(fw-w.w*sc)/2)+'px';
+    iframe.style.top=Math.max(0,(fh-w.h*sc)/2)+'px';
+  });
+
+  ['x','y','w','h'].forEach(k => {
+    const inp = $('coord-'+k);
+    inp.oninput = () => { const v=parseInt(inp.value,10); if(Number.isFinite(v)){w[k]=v;commitBounds(w);} };
+  });
+  $('coord-ratio').oninput = e => {
+    const v = parseFloat(e.target.value);
+    if(Number.isFinite(v)&&v>0){w.ratio=v;$('ratio-lock-note').textContent='Locked';$('ratio-lock-note').classList.add('locked');}
+  };
+
+  const ds = $('widget-display');
+  if (ds) ds.onchange = async () => {
+    const newIdx = +ds.value;
+    if (newIdx===(w.displayIndex||0)) return;
+    w.displayIndex=newIdx; state.previewDisplayIdx=newIdx;
+    await window.electronAPI.overlays.updateBounds(w.id,{displayIndex:w.displayIndex,x:w.x,y:w.y,w:w.w,h:w.h});
+    renderAll();
+  };
+
+  const fBtn=$('focus-this'); if(fBtn) fBtn.onclick=()=>window.electronAPI.overlays.setFocus?.(w.id);
+  const cBtn=$('cycle-this'); if(cBtn) cBtn.onclick=()=>{window.electronAPI.overlays.setFocus?.(w.id);window.electronAPI.overlays.cyclePage?.(+1);};
+}
+
+// ── HOTKEY ASSIGN ────────────────────────────────────────────────
+function startAssign(k) { if(state.listeningAction) stopAssign(false); state.listeningAction=k; renderGlobalHotkeys(); }
+function stopAssign(r=true) { state.listeningAction=null; if(r) renderGlobalHotkeys(); }
+function onHwInput(data) {
+  if(!state.listeningAction) return;
+  if(typeof data.joy_id!=='number'||typeof data.button_id!=='number') return;
+  const action=state.listeningAction;
+  for(const a of HK_ACTIONS){const b=state.hotkeys[a.k];if(b&&b.joy_id===data.joy_id&&b.button_id===data.button_id)state.hotkeys[a.k]=null;}
+  state.hotkeys[action]={joy_id:data.joy_id,button_id:data.button_id};
+  markDirty(true); stopAssign(true);
+}
+
+let _hwFlash=null;
+function flashHwIndicator(data) {
+  const pill=$('hw-status'), lbl=$('hw-status-lbl');
+  if(!pill||!lbl) return;
+  pill.classList.add('active');
+  lbl.textContent=`J${data.joy_id}·B${data.button_id}`;
+  clearTimeout(_hwFlash);
+  _hwFlash=setTimeout(()=>{pill.classList.remove('active');lbl.textContent='No HW input';},800);
+}
+
+// ── TOPBAR BINDINGS ──────────────────────────────────────────────
+function bindTopbar() {
+  $('btn-reset').onclick = async () => {
+    window.electronAPI.overlays.reload();
+    await new Promise(r=>setTimeout(r,300));
+    const s=await window.electronAPI.overlays.getState();
+    state.widgets=s.widgets||[]; state.displays=s.displays||[];
+    try{const hk=await window.electronAPI.overlays.hotkeysGet();if(hk&&typeof hk==='object'&&!Array.isArray(hk))for(const a of HK_ACTIONS)state.hotkeys[a.k]=hk[a.k]||null;}catch(_){}
+    markDirty(false); renderAll();
+  };
+  $('btn-save').onclick = async () => {
+    const ok=await window.electronAPI.overlays.hotkeysSave(state.hotkeys);
+    if(ok){markDirty(false);window.electronAPI.hardware?.reloadHotkeys();}
+    else alert('Failed to save bindings');
+  };
+  const editFn=()=>{state.editMode=!state.editMode;window.electronAPI.overlays.setEditMode(state.editMode);renderTopbarState();};
+  const showFn=()=>{state.forceShow=!state.forceShow;window.electronAPI.overlays.setForceShow(state.forceShow);renderTopbarState();};
+  $('btn-edit-toggle').onclick=editFn; $('btn-show-toggle').onclick=showFn;
+  $('btn-edit-toggle-2').onclick=editFn; $('btn-show-toggle-2').onclick=showFn;
+}
+
+let _resizeT=null;
+window.addEventListener('resize',()=>{clearTimeout(_resizeT);_resizeT=setTimeout(()=>{renderPreview();renderSettings();},150);});
+
+init();
+</script>
+</body>
+</html>

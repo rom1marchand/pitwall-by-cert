@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitwall — Workspace</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<style>
+body { overflow: hidden; }
+
+#pw-layout {
+  display: flex;
+  height: calc(100vh - 48px - 38px);
+}
+
+/* ── SIDEBAR ── */
+#pw-sidebar {
+  width: 200px;
+  min-width: 200px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 200;
+}
+.sb-section {
+  font-size: 9px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 14px 16px 6px;
+}
+.sb-btn {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 16px;
+  background: none; border: none; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--muted);
+  transition: background .12s, color .12s; text-align: left;
+}
+.sb-btn:hover { background: var(--card); color: var(--text); }
+.sb-btn.active { color: var(--lime); }
+.sb-btn.active .sb-dot { background: var(--lime); box-shadow: 0 0 6px var(--lime); }
+.sb-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.sb-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); margin-left: auto; flex-shrink: 0;
+  transition: background .15s;
+}
+.sb-divider { height: 1px; background: var(--border); margin: 6px 12px; }
+
+/* Connection status in sidebar */
+#sb-conn {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+#sb-conn-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+  flex-shrink: 0; transition: background .3s;
+}
+#sb-conn-dot.on  { background: var(--lime); box-shadow: 0 0 6px var(--lime); }
+#sb-conn-dot.err { background: var(--red); }
+
+/* ── WORKSPACE CANVAS ── */
+#pw-canvas {
+  flex: 1; position: relative; overflow: hidden;
+  background: #080808;
+  min-height: 0;
+}
+
+/* ── FLOATING WINDOWS ── */
+.pw-win {
+  position: absolute;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  min-width: 180px; min-height: 100px;
+  display: flex; flex-direction: column;
+  transition: none;
+}
+.pw-win.snapping {
+  transition: left .15s ease, top .15s ease, width .15s ease, height .15s ease;
+}
+.pw-win-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px;
+  background: #131313;
+  border-bottom: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  cursor: grab; user-select: none; flex-shrink: 0;
+}
+.pw-win-header:active { cursor: grabbing; }
+.pw-win-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+}
+.pw-win-close {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 14px; padding: 0 3px; line-height: 1;
+  transition: color .12s;
+}
+.pw-win-close:hover { color: var(--text); }
+.pw-win-body { padding: 12px; overflow: auto; flex: 1; min-height: 0; }
+
+/* ── RESIZE HANDLES ── */
+.pw-resize {
+  position: absolute; z-index: 5;
+}
+.pw-resize-e  { right: -3px; top: 0; width: 6px; height: 100%; cursor: ew-resize; }
+.pw-resize-s  { bottom: -3px; left: 0; width: 100%; height: 6px; cursor: ns-resize; }
+.pw-resize-se { right: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nwse-resize; }
+.pw-resize-w  { left: -3px; top: 0; width: 6px; height: 100%; cursor: ew-resize; }
+.pw-resize-n  { top: -3px; left: 0; width: 100%; height: 6px; cursor: ns-resize; }
+
+/* ── SNAP GUIDE ── */
+#snap-guide {
+  position: absolute; z-index: 9999; pointer-events: none; display: none;
+  background: rgba(200,255,0,.08);
+  border: 2px solid rgba(200,255,0,.4);
+  border-radius: 6px;
+  transition: all .1s ease;
+}
+
+/* ── LEADERBOARD ── */
+.lb-table { width: 100%; border-collapse: collapse; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; }
+.lb-table th {
+  font-size: 9px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; padding: 0 6px 8px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.lb-table td { padding: 5px 6px; border-bottom: 1px solid #181818; white-space: nowrap; }
+.lb-table tr.lb-player td { color: var(--lime); background: rgba(200,255,0,.04); }
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-pos { width: 22px; font-weight: 700; color: var(--muted); }
+.lb-gap { color: var(--muted); font-size: 12px; }
+.lb-lap { color: var(--muted); font-size: 12px; }
+.lb-pits { font-size: 11px; }
+.lb-brand { height: 16px; width: 20px; object-fit: contain; opacity: .7; vertical-align: middle; margin-right: 4px; }
+.lb-cat { font-weight: 800; font-size: 11px; }
+
+/* ── SPEED / GEAR ── */
+.spd-gear {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 80px; font-weight: 900; line-height: 1;
+  color: var(--lime); text-align: center; margin-bottom: 4px;
+}
+.spd-speed {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 52px; font-weight: 700; line-height: 1;
+  color: var(--text); text-align: center;
+}
+.spd-unit {
+  font-size: 11px; color: var(--muted); letter-spacing: .15em;
+  text-transform: uppercase; text-align: center; margin-bottom: 14px;
+}
+.spd-bars {
+  display: flex; gap: 10px; justify-content: center;
+  align-items: flex-end; height: 64px; margin-bottom: 12px;
+}
+.spd-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 48px; }
+.spd-bar-label { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.spd-bar-track {
+  width: 100%; flex: 1; background: var(--border);
+  border-radius: 2px; overflow: hidden; display: flex; align-items: flex-end;
+}
+.spd-bar-fill { width: 100%; transition: height .08s linear; border-radius: 2px; }
+.spd-bar-val { font-size: 11px; font-weight: 700; }
+.spd-rpm-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.spd-rpm-track { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.spd-rpm-fill { height: 100%; transition: width .08s linear; border-radius: 3px; }
+
+/* ── TYRES ── */
+.tyres-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tyre-cell {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 10px; text-align: center;
+}
+.tyre-pos { font-size: 9px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.tyre-cmp {
+  display: inline-block; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 2px;
+  background: rgba(200,255,0,.1); color: var(--lime); margin-bottom: 6px;
+}
+.tyre-temp { font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 700; line-height: 1.1; }
+.tyre-wear { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 600; margin-top: 2px; }
+.tyre-pres { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ── TYRE TELEMETRY ── */
+.tyrtel-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid #181818;
+}
+.tyrtel-row:last-child { border-bottom: none; }
+.tyrtel-lbl { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; color: var(--muted); width: 26px; flex-shrink: 0; }
+.tyrtel-zones { display: flex; gap: 5px; flex: 1; }
+.tyrtel-zone { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.tyrtel-zone-lbl { font-size: 8px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.tyrtel-zone-bar { width: 100%; height: 40px; background: var(--border); border-radius: 2px; overflow: hidden; position: relative; }
+.tyrtel-zone-fill { position: absolute; bottom: 0; left: 0; right: 0; transition: height .15s; }
+.tyrtel-zone-val { font-size: 10px; font-weight: 700; font-family: 'Barlow Condensed', sans-serif; }
+
+/* ── WEATHER PANEL ── */
+.wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.wx-item { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 7px 10px; }
+.wx-item.wide { grid-column: 1/-1; }
+.wx-key { font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.wx-val { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; }
+.wx-fc-tabs { display: flex; gap: 3px; margin-top: 10px; }
+.wx-fc-tab {
+  flex: 1; padding: 3px 0; text-align: center; font-size: 9px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
+}
+.wx-fc-tab.active { color: var(--lime); border-color: var(--lime); background: rgba(200,255,0,.06); }
+.wx-fc-timeline { display: flex; gap: 2px; margin-top: 6px; }
+.wx-fc-node {
+  flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 3px;
+  padding: 5px 3px; text-align: center; min-width: 0;
+}
+.wx-fc-node.active { border-color: var(--lime); background: rgba(200,255,0,.04); }
+.wx-fc-lbl { font-size: 7px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.wx-fc-row { font-size: 10px; color: #aaa; line-height: 1.6; white-space: nowrap; }
+.wx-fc-row .v { color: var(--text); font-weight: 600; font-family: 'Barlow Condensed',sans-serif; }
+.wx-fc-row.rain { color: #38bdf8; }
+.wx-fc-row.rain .v { color: #38bdf8; }
+
+/* ── FLAGS PANEL ── */
+.flags-current { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.flags-icon { width: 40px; height: 24px; border-radius: 3px; flex-shrink: 0; }
+.flags-icon.f-green  { background: #22c55e; }
+.flags-icon.f-yellow { background: #facc15; }
+.flags-icon.f-blue   { background: #3b8fff; }
+.flags-icon.f-white  { background: #e5e5e5; }
+.flags-icon.f-checkered { background: repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50%/8px 8px; }
+.flags-label { font-family: 'Barlow Condensed',sans-serif; font-size: 22px; font-weight: 900; text-transform: uppercase; }
+.flags-detail { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 6px; }
+.flags-row { display: flex; justify-content: space-between; align-items: center; }
+.flags-row-key { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.flags-row-val { font-family: 'Barlow Condensed',sans-serif; font-size: 14px; font-weight: 700; }
+
+/* ── FUEL/VE PANEL ── */
+.fuel-big { font-family: 'Barlow Condensed',sans-serif; font-size: 42px; font-weight: 900; line-height: 1; }
+.fuel-sub { font-size: 10px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.fuel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+.fuel-item { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 8px 10px; }
+.fuel-item.wide { grid-column: 1/-1; }
+.fuel-key { font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.fuel-val { font-family: 'Barlow Condensed',sans-serif; font-size: 18px; font-weight: 700; }
+.fuel-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.fuel-bar { height: 100%; border-radius: 3px; transition: width .5s, background .3s; }
+
+/* ── CONNECTING ── */
+.pw-connecting {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 24px; gap: 10px;
+  color: var(--muted); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+}
+
+/* ── SESSION BAR ── */
+.pw-session-bar {
+  display: flex; align-items: center;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 14px; height: 38px; flex-shrink: 0; gap: 0; overflow: hidden;
+}
+.pw-sb-item {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 0 14px; border-right: 1px solid var(--border); min-width: 70px; height: 100%;
+}
+.pw-sb-item:first-child { padding-left: 0; }
+.pw-sb-key { font-size: 7px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); }
+.pw-sb-val { font-family: 'Barlow Condensed',sans-serif; font-size: 14px; font-weight: 700; }
+.pw-sb-val.lime { color: var(--lime); }
+.pw-flag {
+  margin-left: auto; padding-left: 14px;
+  font-family: 'Barlow Condensed',sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px;
+}
+.pw-flag-icon {
+  display: inline-block; width: 22px; height: 12px; border-radius: 2px; vertical-align: middle;
+}
+.pw-flag-icon.f-green  { background: #22c55e; }
+.pw-flag-icon.f-yellow { background: #facc15; }
+.pw-flag-icon.f-blue   { background: #3b8fff; }
+.pw-flag-icon.f-white  { background: #e5e5e5; }
+.pw-flag-icon.f-checkered { background: repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50%/8px 8px; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<header id="app-header"></header>
+
+<!-- Session info bar -->
+<div class="pw-session-bar" id="pw-session-bar">
+  <img id="pw-track-logo" src="assets/tracks/logos/Circuit=Default.svg" alt="" style="height:22px;width:auto;margin-right:8px;opacity:.8">
+  <div class="pw-sb-item"><div class="pw-sb-key">Track</div><div class="pw-sb-val" id="pw-s-track">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Session</div><div class="pw-sb-val" id="pw-s-session">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Remaining</div><div class="pw-sb-val lime" id="pw-s-time">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Lap</div><div class="pw-sb-val" id="pw-s-lap">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Track</div><div class="pw-sb-val" id="pw-s-ttemp">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Air</div><div class="pw-sb-val" id="pw-s-atemp">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Grip</div><div class="pw-sb-val" id="pw-s-grip">—</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Rain</div><div class="pw-sb-val" id="pw-s-rain">Dry</div></div>
+  <div class="pw-sb-item"><div class="pw-sb-key">Cars</div><div class="pw-sb-val" id="pw-s-cars">—</div></div>
+  <div class="pw-flag" id="pw-s-flag"></div>
+</div>
+
+<div id="pw-layout">
+  <!-- ── Sidebar ── -->
+  <aside id="pw-sidebar">
+    <div class="sb-section" data-i18n="workspace">Panels</div>
+
+    <button class="sb-btn" data-panel="leaderboard" onclick="togglePanel('leaderboard')">
+      <span class="sb-icon">☰</span><span data-i18n="leaderboard">Leaderboard</span><span class="sb-dot"></span>
+    </button>
+    <button class="sb-btn" data-panel="trackmap" onclick="togglePanel('trackmap')">
+      <span class="sb-icon">◎</span><span data-i18n="trackMap">Track Map</span><span class="sb-dot"></span>
+    </button>
+
+    <div class="sb-divider"></div>
+
+    <button class="sb-btn" data-panel="speed" onclick="togglePanel('speed')">
+      <span class="sb-icon">↗</span><span>Speed / Gear</span><span class="sb-dot"></span>
+    </button>
+    <button class="sb-btn" data-panel="tyres" onclick="togglePanel('tyres')">
+      <span class="sb-icon">○</span><span>Tyres</span><span class="sb-dot"></span>
+    </button>
+    <button class="sb-btn" data-panel="tyrtelemetry" onclick="togglePanel('tyrtelemetry')">
+      <span class="sb-icon">≡</span><span>Tyre Telemetry</span><span class="sb-dot"></span>
+    </button>
+
+    <div class="sb-divider"></div>
+
+    <button class="sb-btn" data-panel="weather" onclick="togglePanel('weather')">
+      <span class="sb-icon">☁</span><span>Weather</span><span class="sb-dot"></span>
+    </button>
+    <button class="sb-btn" data-panel="flags" onclick="togglePanel('flags')">
+      <span class="sb-icon">⚑</span><span>Flags</span><span class="sb-dot"></span>
+    </button>
+    <button class="sb-btn" data-panel="fuelve" onclick="togglePanel('fuelve')">
+      <span class="sb-icon">⚡</span><span>Fuel / VE</span><span class="sb-dot"></span>
+    </button>
+
+    <div id="sb-conn">
+      <div id="sb-conn-dot"></div>
+      <span id="sb-conn-label" data-i18n="connecting">Connecting…</span>
+    </div>
+  </aside>
+
+  <!-- ── Canvas ── -->
+  <div id="pw-canvas">
+    <div id="snap-guide"></div>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+Auth.requireAuth()
+
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+
+// ── Global state ──
+let _session   = {}
+let _driver    = {}
+let _standings = []
+let _trackData = null
+let _zTop      = 100
+let _sessionMode = ''
+let _forecastData = null
+let _fcSession = null
+
+// ── VE/Fuel tracking ──
+let _veHistory = []
+let _vePrevVal = null
+let _vePrevLaps = null
+let _fuelHistory = []
+let _fuelPrevVal = null
+let _fuelPrevLaps = null
+
+// ── Session constants ──
+const GRIP_LABELS = ['Green', 'Low Rubber', 'Medium', 'Heavy', 'Saturated']
+const SESSION_LABELS = {0:'Test Day',1:'Practice 1',2:'Practice 2',3:'Practice 3',4:'Practice 4',
+  5:'Qualifying 1',6:'Qualifying 2',7:'Qualifying 3',8:'Qualifying 4',
+  9:'Warm Up',10:'Race',11:'Race 2',12:'Race 3',13:'Race 4'}
+const SKY_LABELS = ['Clear','Light clouds','Partly cloudy','Mostly cloudy','Overcast','Drizzle','Light rain','Overcast rain','Rain','Heavy rain','Storm']
+const WEATHER_ICONS = ['☀️','🌤','⛅','🌥','☁️','🌦','🌧','🌧','🌧','⛈','⛈']
+const FC_NODE_ORDER = ['START','NODE_25','NODE_50','NODE_75','FINISH']
+const FC_NODE_LABELS = {START:'Start',NODE_25:'25%',NODE_50:'50%',NODE_75:'75%',FINISH:'End'}
+const FC_SESSION_ORDER = ['PRACTICE','QUALIFY','RACE']
+
+// ── Category system ──
+const CAT_ORDER  = ['hyper','lmp2','lmp3','gte','gt3','other']
+const CAT_COLORS = { hyper:'#e11d48', lmp2:'#3b8fff', lmp3:'#a855f7', gte:'#22c55e', gt3:'#ff8c00', other:'#666' }
+
+function catKey(vc) {
+  const c = (vc || '').toLowerCase()
+  if (c.includes('hyper') || c === 'hy') return 'hyper'
+  if (c.includes('lmp3'))  return 'lmp3'
+  if (c.includes('lmp2'))  return 'lmp2'
+  if (c.includes('gte'))   return 'gte'
+  if (c.includes('gt3'))   return 'gt3'
+  return 'other'
+}
+
+function brandLogo(car) {
+  const ck = catKey(car.vehicle_class)
+  if (ck === 'lmp2' || ck === 'lmp3') return 'assets/cars/Brand=Oreca.svg'
+  return Assets.carLogo(car.vehicle)
+}
+
+// ── Panel config ──
+const SNAP_GAP = 6
+const PANELS = {
+  leaderboard:  { titleKey: 'Leaderboard',    x: 0,    y: 0,   w: 480, h: 420 },
+  trackmap:     { titleKey: 'Track Map',       x: 486,  y: 0,   w: 420, h: 420 },
+  speed:        { titleKey: 'Speed / Gear',    x: 912,  y: 0,   w: 290, h: 420 },
+  tyres:        { titleKey: 'Tyres',           x: 0,    y: 426, w: 350, h: 320 },
+  tyrtelemetry: { titleKey: 'Tyre Telemetry',  x: 356,  y: 426, w: 380, h: 320 },
+  weather:      { titleKey: 'Weather',         x: 742,  y: 426, w: 460, h: 320 },
+  flags:        { titleKey: 'Flags',           x: 0,    y: 0,   w: 300, h: 240 },
+  fuelve:       { titleKey: 'Fuel / VE',       x: 306,  y: 0,   w: 380, h: 320 },
+}
+
+const _open = new Set()
+
+// ── Panel toggle / open / close ──
+function togglePanel(id) {
+  _open.has(id) ? closePanel(id) : openPanel(id)
+}
+
+function openPanel(id) {
+  if (_open.has(id)) {
+    const el = document.getElementById('win-' + id)
+    if (el) el.style.zIndex = ++_zTop
+    return
+  }
+  _open.add(id)
+  const btn = document.querySelector(`.sb-btn[data-panel="${id}"]`)
+  if (btn) btn.classList.add('active')
+  _createWindow(id)
+  if (id === 'trackmap' && !_trackData) _fetchTrackData()
+  if (id === 'weather' && !_forecastData) _loadForecast()
+}
+
+function closePanel(id) {
+  _open.delete(id)
+  const btn = document.querySelector(`.sb-btn[data-panel="${id}"]`)
+  if (btn) btn.classList.remove('active')
+  document.getElementById('win-' + id)?.remove()
+}
+
+function _createWindow(id) {
+  const cfg = PANELS[id]
+  if (!cfg) return
+  const canvas = document.getElementById('pw-canvas')
+  const cW = canvas.offsetWidth, cH = canvas.offsetHeight
+
+  // Load saved position or use default
+  const saved = _loadWinState(id)
+  const x = saved?.x ?? cfg.x
+  const y = saved?.y ?? cfg.y
+  const w = saved?.w ?? cfg.w
+  const h = saved?.h ?? cfg.h
+
+  const div = document.createElement('div')
+  div.className = 'pw-win'
+  div.id = 'win-' + id
+  div.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${++_zTop}`
+  div.innerHTML = `
+    <div class="pw-win-header" id="wh-${id}">
+      <span class="pw-win-title">${esc(cfg.titleKey).toUpperCase()}</span>
+      <button class="pw-win-close" onclick="closePanel('${id}')">✕</button>
+    </div>
+    <div class="pw-win-body" id="wb-${id}">
+      <div class="pw-connecting"><div class="spinner"></div>Waiting for data…</div>
+    </div>
+    <div class="pw-resize pw-resize-e" data-dir="e"></div>
+    <div class="pw-resize pw-resize-s" data-dir="s"></div>
+    <div class="pw-resize pw-resize-se" data-dir="se"></div>
+    <div class="pw-resize pw-resize-w" data-dir="w"></div>
+    <div class="pw-resize pw-resize-n" data-dir="n"></div>`
+
+  div.addEventListener('mousedown', () => { div.style.zIndex = ++_zTop })
+  canvas.appendChild(div)
+  _makeDraggable(div, document.getElementById('wh-' + id))
+  _makeResizable(div)
+  _renderPanel(id)
+}
+
+// ── Save / Load window positions ──
+function _saveWinState(id) {
+  const el = document.getElementById('win-' + id)
+  if (!el) return
+  const states = JSON.parse(localStorage.getItem('pw_win_states') || '{}')
+  states[id] = {
+    x: parseInt(el.style.left) || 0,
+    y: parseInt(el.style.top) || 0,
+    w: parseInt(el.style.width) || 300,
+    h: parseInt(el.style.height) || 300,
+  }
+  localStorage.setItem('pw_win_states', JSON.stringify(states))
+}
+
+function _loadWinState(id) {
+  const states = JSON.parse(localStorage.getItem('pw_win_states') || '{}')
+  return states[id] || null
+}
+
+// ── Drag with snap ──
+let _drag = null
+
+function _makeDraggable(win, handle) {
+  handle.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('pw-win-close')) return
+    win.classList.remove('snapping')
+    _drag = {
+      win, mode: 'move',
+      sx: e.clientX, sy: e.clientY,
+      sl: parseInt(win.style.left) || 0,
+      st: parseInt(win.style.top) || 0,
+      sw: parseInt(win.style.width) || 300,
+      sh: parseInt(win.style.height) || 300,
+    }
+    e.preventDefault()
+  })
+}
+
+// ── Resize ──
+let _resize = null
+
+function _makeResizable(win) {
+  win.querySelectorAll('.pw-resize').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.stopPropagation()
+      win.classList.remove('snapping')
+      _resize = {
+        win, dir: handle.dataset.dir,
+        sx: e.clientX, sy: e.clientY,
+        sl: parseInt(win.style.left) || 0,
+        st: parseInt(win.style.top) || 0,
+        sw: parseInt(win.style.width) || 300,
+        sh: parseInt(win.style.height) || 300,
+      }
+      e.preventDefault()
+    })
+  })
+}
+
+// ── Snap zones ──
+const SNAP_THRESHOLD = 24
+
+function _getSnapZone(mx, my) {
+  const canvas = document.getElementById('pw-canvas')
+  const cW = canvas.offsetWidth, cH = canvas.offsetHeight
+  const g = SNAP_GAP
+
+  // Edges → halves
+  if (mx < SNAP_THRESHOLD) {
+    if (my < SNAP_THRESHOLD) return { x: g, y: g, w: cW/2 - g*1.5, h: cH/2 - g*1.5, zone: 'tl' }
+    if (my > cH - SNAP_THRESHOLD) return { x: g, y: cH/2 + g/2, w: cW/2 - g*1.5, h: cH/2 - g*1.5, zone: 'bl' }
+    return { x: g, y: g, w: cW/2 - g*1.5, h: cH - g*2, zone: 'left' }
+  }
+  if (mx > cW - SNAP_THRESHOLD) {
+    if (my < SNAP_THRESHOLD) return { x: cW/2 + g/2, y: g, w: cW/2 - g*1.5, h: cH/2 - g*1.5, zone: 'tr' }
+    if (my > cH - SNAP_THRESHOLD) return { x: cW/2 + g/2, y: cH/2 + g/2, w: cW/2 - g*1.5, h: cH/2 - g*1.5, zone: 'br' }
+    return { x: cW/2 + g/2, y: g, w: cW/2 - g*1.5, h: cH - g*2, zone: 'right' }
+  }
+  if (my < SNAP_THRESHOLD) return { x: g, y: g, w: cW - g*2, h: cH/2 - g*1.5, zone: 'top' }
+  if (my > cH - SNAP_THRESHOLD) return { x: g, y: cH/2 + g/2, w: cW - g*2, h: cH/2 - g*1.5, zone: 'bottom' }
+  return null
+}
+
+function _showSnapGuide(zone) {
+  const guide = document.getElementById('snap-guide')
+  if (!zone) { guide.style.display = 'none'; return }
+  guide.style.display = 'block'
+  guide.style.left   = Math.round(zone.x) + 'px'
+  guide.style.top    = Math.round(zone.y) + 'px'
+  guide.style.width  = Math.round(zone.w) + 'px'
+  guide.style.height = Math.round(zone.h) + 'px'
+}
+
+document.addEventListener('mousemove', e => {
+  if (_drag && _drag.mode === 'move') {
+    const nx = _drag.sl + e.clientX - _drag.sx
+    const ny = _drag.st + e.clientY - _drag.sy
+    _drag.win.style.left = nx + 'px'
+    _drag.win.style.top  = ny + 'px'
+
+    // Snap detection — coords relative to canvas
+    const canvas = document.getElementById('pw-canvas')
+    const rect = canvas.getBoundingClientRect()
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top
+    const zone = _getSnapZone(mx, my)
+    _showSnapGuide(zone)
+    _drag._snapZone = zone
+  }
+
+  if (_resize) {
+    const r = _resize
+    const dx = e.clientX - r.sx, dy = e.clientY - r.sy
+    const dir = r.dir
+
+    let nx = r.sl, ny = r.st, nw = r.sw, nh = r.sh
+    if (dir.includes('e')) nw = Math.max(180, r.sw + dx)
+    if (dir.includes('s')) nh = Math.max(100, r.sh + dy)
+    if (dir.includes('w')) { nw = Math.max(180, r.sw - dx); nx = r.sl + dx }
+    if (dir.includes('n')) { nh = Math.max(100, r.sh - dy); ny = r.st + dy }
+
+    r.win.style.left   = nx + 'px'
+    r.win.style.top    = ny + 'px'
+    r.win.style.width  = nw + 'px'
+    r.win.style.height = nh + 'px'
+  }
+})
+
+document.addEventListener('mouseup', () => {
+  if (_drag && _drag._snapZone) {
+    const z = _drag._snapZone
+    const win = _drag.win
+    win.classList.add('snapping')
+    win.style.left   = Math.round(z.x) + 'px'
+    win.style.top    = Math.round(z.y) + 'px'
+    win.style.width  = Math.round(z.w) + 'px'
+    win.style.height = Math.round(z.h) + 'px'
+    setTimeout(() => win.classList.remove('snapping'), 200)
+  }
+  _showSnapGuide(null)
+
+  // Save positions
+  if (_drag) { const id = _drag.win.id.replace('win-',''); _saveWinState(id) }
+  if (_resize) { const id = _resize.win.id.replace('win-',''); _saveWinState(id) }
+
+  // Re-render trackmap canvas on resize
+  if ((_drag?._snapZone || _resize) && _open.has('trackmap')) {
+    setTimeout(() => _renderTrackMap(), 220)
+  }
+
+  _drag = null
+  _resize = null
+})
+
+// ── Render dispatcher ──
+function _renderPanel(id) {
+  switch (id) {
+    case 'leaderboard':  _renderLeaderboard(); break
+    case 'trackmap':     _renderTrackMap();    break
+    case 'speed':        _renderSpeed();       break
+    case 'tyres':        _renderTyres();       break
+    case 'tyrtelemetry': _renderTyrTelemetry();break
+    case 'weather':      _renderWeather();     break
+    case 'flags':        _renderFlags();       break
+    case 'fuelve':       _renderFuelVE();      break
+  }
+}
+
+function _setBody(id, html) {
+  const el = document.getElementById('wb-' + id)
+  if (el) el.innerHTML = html
+}
+
+// ── Helpers ──
+function _getTyre(type, corner) {
+  const nested = _driver[type]
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) return nested[corner] || 0
+  return _driver[`${type}_${corner}`] || 0
+}
+
+function _tyreColor(temp, opt) {
+  const base = opt || 90
+  const d = temp - base
+  if (d < -25) return '#3b8fff'
+  if (d < -10) return '#7bc8ff'
+  if (d <  10) return '#C8FF00'
+  if (d <  25) return '#ff8c00'
+  return '#ff3b3b'
+}
+
+// ── Leaderboard ──
+function _renderLeaderboard() {
+  if (!_standings.length) {
+    _setBody('leaderboard', '<div class="pw-connecting"><div class="spinner"></div>Waiting for data…</div>')
+    return
+  }
+  const sorted = [..._standings].sort((a, b) => a.position - b.position)
+  const isQuali = _sessionMode === 'quali'
+  const leader = sorted.find(c => c.position === 1)
+  const p1Best = (leader && leader.best_lap > 0) ? leader.best_lap : -1
+
+  const catCounters = {}
+  sorted.forEach(car => {
+    const ck = catKey(car.vehicle_class)
+    catCounters[ck] = (catCounters[ck] || 0) + 1
+    car._catPos = catCounters[ck]; car._catKey = ck
+  })
+
+  const rows = sorted.map(car => {
+    const isP = car.is_player, ck = car._catKey, ccol = CAT_COLORS[ck] || '#666'
+    const logo = brandLogo(car), hasLaps = car.total_laps > 0
+    let gap = ''
+    if (isQuali) {
+      if (car.position === 1) gap = car.best_lap > 0 ? fmtLap(car.best_lap) : '—'
+      else if (car.best_lap > 0 && p1Best > 0) gap = '+' + (car.best_lap - p1Best).toFixed(3)
+      else gap = '—'
+    } else {
+      if (car.position === 1) gap = hasLaps ? 'LEADER' : '—'
+      else if (!hasLaps) gap = '—'
+      else if (car.time_behind_leader > 0) gap = '+' + car.time_behind_leader.toFixed(3)
+      else if (leader && car.total_laps < leader.total_laps) gap = '-' + (leader.total_laps - car.total_laps) + 'L'
+      else gap = '—'
+    }
+    const best = car.best_lap > 0 ? fmtLap(car.best_lap) : '—'
+    const last = car.last_lap > 0 ? fmtLap(car.last_lap) : '—'
+    const pit = car.in_pits ? '<span style="color:var(--lime);font-size:10px">PIT</span>' : ''
+
+    return `<tr class="${isP?'lb-player':''}" style="border-left:3px solid ${ccol}">
+      <td class="lb-pos">${car.position}</td>
+      <td class="lb-cat" style="color:${ccol}">${car._catPos}</td>
+      <td><img src="${esc(logo)}" alt="" class="lb-brand" onerror="this.style.display='none'">${esc(car.name||'')}</td>
+      <td class="lb-gap">${gap}</td>
+      <td class="lb-lap">${isQuali ? best : last}</td>
+      <td class="lb-pits">${pit}</td>
+    </tr>`
+  }).join('')
+
+  _setBody('leaderboard', `<table class="lb-table">
+    <thead><tr><th>P</th><th style="text-align:center">Cat</th><th>Driver</th><th>${isQuali?'Gap P1':'Gap'}</th><th>${isQuali?'Best':'Last'}</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`)
+}
+
+// ── Speed / Gear ──
+function _renderSpeed() {
+  const d = _driver
+  const speed = Math.round(d.speed_kmh || 0)
+  const gRaw = d.gear, gear = gRaw === 0 ? 'N' : gRaw === -1 ? 'R' : (gRaw || '—')
+  const rpm = d.rpm || 0, rpmMax = d.rpm_max || 8500
+  const thr = Math.min(100, Math.max(0, Math.round(d.throttle || 0)))
+  const brk = Math.min(100, Math.max(0, Math.round(d.brake || 0)))
+  const rpmPct = Math.min(100, (rpm / rpmMax) * 100).toFixed(1)
+  const rpmCol = rpmPct > 90 ? 'var(--red)' : rpmPct > 75 ? 'var(--orange)' : 'var(--lime)'
+
+  _setBody('speed', `<div style="text-align:center;padding:4px 0">
+    <div class="spd-gear">${gear}</div><div class="spd-speed">${speed}</div><div class="spd-unit">km/h</div>
+    <div class="spd-bars">
+      <div class="spd-bar-col"><div class="spd-bar-label" style="color:#3b8fff">THROT</div>
+        <div class="spd-bar-track"><div class="spd-bar-fill" style="height:${thr}%;background:#3b8fff"></div></div>
+        <div class="spd-bar-val" style="color:#3b8fff">${thr}%</div></div>
+      <div class="spd-bar-col"><div class="spd-bar-label" style="color:var(--red)">BRAKE</div>
+        <div class="spd-bar-track"><div class="spd-bar-fill" style="height:${brk}%;background:var(--red)"></div></div>
+        <div class="spd-bar-val" style="color:var(--red)">${brk}%</div></div>
+    </div>
+    <div><div class="spd-rpm-label"><span>RPM</span><span>${rpm.toLocaleString()}</span></div>
+      <div class="spd-rpm-track"><div class="spd-rpm-fill" style="width:${rpmPct}%;background:${rpmCol}"></div></div></div>
+  </div>`)
+}
+
+// ── Tyres ──
+function _renderTyres() {
+  const corners = ['fl','fr','rl','rr'], labels = {fl:'FL',fr:'FR',rl:'RL',rr:'RR'}
+  const cells = corners.map(c => {
+    const temp = _getTyre('tyre_temp', c), wear = Math.round(_getTyre('tyre_wear', c))
+    const pres = (_getTyre('tyre_pressure', c)).toFixed(1)
+    const opt = _driver[`tyre_optimal_${c}`] || null
+    const col = temp > 0 ? _tyreColor(temp, opt) : 'var(--muted)'
+    const cmp = _session[`tyre_compound_${c}`] || _session.tyre_compound || _driver[`tyre_compound_${c}`] || '?'
+    const wCol = wear >= 0 && wear < 70 ? 'var(--red)' : wear < 85 ? 'var(--orange)' : 'var(--text)'
+    return `<div class="tyre-cell"><div class="tyre-pos">${labels[c]}</div>
+      <div class="tyre-cmp">${esc(String(cmp)[0]||'?')}</div>
+      <div class="tyre-temp" style="color:${col}">${temp > 0 ? Math.round(temp)+'°' : '—'}</div>
+      <div class="tyre-wear" style="color:${wCol}">${wear != null && wear >= 0 ? wear+'%' : '—'}</div>
+      <div class="tyre-pres">${parseFloat(pres)>0 ? pres+' kPa' : '—'}</div></div>`
+  }).join('')
+  _setBody('tyres', `<div class="tyres-grid">${cells}</div>`)
+}
+
+// ── Tyre Telemetry ──
+function _renderTyrTelemetry() {
+  const corners = ['fl','fr','rl','rr'], zlabels = ['IN','MID','OUT']
+  const rows = corners.map(c => {
+    let zones = _driver[`tyre_temp_${c}_zones`]
+    if (!zones || !Array.isArray(zones)) zones = [0,0,0]
+    const opt = _driver[`tyre_optimal_${c}`] || null
+    const zonesHTML = zones.map((t,i) => {
+      const col = t > 0 ? _tyreColor(t,opt) : 'var(--border)'
+      const pct = t > 0 ? Math.min(100, Math.max(0, ((t-40)/80)*100)).toFixed(0) : 0
+      return `<div class="tyrtel-zone"><div class="tyrtel-zone-lbl">${zlabels[i]}</div>
+        <div class="tyrtel-zone-bar"><div class="tyrtel-zone-fill" style="height:${pct}%;background:${col}"></div></div>
+        <div class="tyrtel-zone-val" style="color:${col}">${t>0?Math.round(t)+'°':'—'}</div></div>`
+    }).join('')
+    return `<div class="tyrtel-row"><div class="tyrtel-lbl">${c.toUpperCase()}</div><div class="tyrtel-zones">${zonesHTML}</div></div>`
+  }).join('')
+  _setBody('tyrtelemetry', `<div>${rows}</div>`)
+}
+
+// ── Track Map ──
+async function _fetchTrackData() {
+  // 1) Try local backend proxy (works if game is running on this PC)
+  try {
+    const r = await fetch('http://localhost:5000/api/get-track-map', { cache: 'no-store', signal: AbortSignal.timeout(2000) })
+    if (r.ok) {
+      const raw = await r.json()
+      _trackData = Array.isArray(raw) ? raw : (raw.points || raw.trackPoints || null)
+      if (_trackData && _trackData.length) { _renderTrackMap(); return }
+    }
+  } catch {}
+  // 2) Check if track map arrived via WebSocket session data
+  if (_session.track_map && Array.isArray(_session.track_map) && _session.track_map.length) {
+    _trackData = _session.track_map
+    _renderTrackMap()
+  }
+}
+
+function _renderTrackMap() {
+  const body = document.getElementById('wb-trackmap')
+  if (!body) return
+  const bw = body.offsetWidth || 374, bh = body.offsetHeight || 360
+
+  if (!body.querySelector('canvas')) {
+    body.innerHTML = `<canvas id="track-canvas" style="display:block;width:100%;height:100%"></canvas>`
+  }
+  const canvas = document.getElementById('track-canvas')
+  if (!canvas) return
+  canvas.width = bw; canvas.height = bh
+
+  const W = canvas.width, H = canvas.height
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, W, H)
+
+  if (!_trackData || !_trackData.length) {
+    ctx.fillStyle = '#333'; ctx.font = '600 12px "Barlow Condensed"'; ctx.textAlign = 'center'
+    ctx.fillText('Track data not available', W/2, H/2)
+    ctx.fillText('(game must be running)', W/2, H/2+18)
+    return
+  }
+
+  const mainTrack = _trackData.filter(p => p.type === 0 || p.type == null)
+  const pts = mainTrack.length ? mainTrack : _trackData
+  const xs = pts.map(p => p.x), zs = pts.map(p => p.z)
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs)
+  const pad = 28
+  const scale = Math.min((W-2*pad)/(maxX-minX||1), (H-2*pad)/(maxZ-minZ||1))
+  const ox = (W-(maxX-minX)*scale)/2, oz = (H-(maxZ-minZ)*scale)/2
+  const tx = x => ox + (x-minX)*scale, tz = z => oz + (z-minZ)*scale
+
+  ctx.strokeStyle = '#1e1e1e'; ctx.lineWidth = 12; ctx.lineCap = ctx.lineJoin = 'round'
+  ctx.beginPath()
+  pts.forEach((p,i) => i===0 ? ctx.moveTo(tx(p.x),tz(p.z)) : ctx.lineTo(tx(p.x),tz(p.z)))
+  ctx.closePath(); ctx.stroke()
+
+  ctx.strokeStyle = '#2d2d2d'; ctx.lineWidth = 4
+  ctx.beginPath()
+  pts.forEach((p,i) => i===0 ? ctx.moveTo(tx(p.x),tz(p.z)) : ctx.lineTo(tx(p.x),tz(p.z)))
+  ctx.closePath(); ctx.stroke()
+
+  const sorted = [..._standings].sort((a,b) => a.position - b.position)
+  sorted.forEach(car => {
+    if (!car.pos_x && !car.pos_z) return
+    const x = tx(car.pos_x), z = tz(car.pos_z)
+    if (car.is_player) {
+      ctx.fillStyle = '#C8FF00'; ctx.beginPath(); ctx.arc(x,z,7,0,Math.PI*2); ctx.fill()
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke()
+    } else {
+      const ccol = CAT_COLORS[catKey(car.vehicle_class)] || '#888'
+      ctx.fillStyle = car.in_pits ? '#555' : ccol
+      ctx.beginPath(); ctx.arc(x,z,4,0,Math.PI*2); ctx.fill()
+    }
+  })
+}
+
+// ══════════════════ NEW PANELS ══════════════════
+
+// ── Weather Panel ──
+async function _loadForecast() {
+  // 1) Try local backend proxy
+  try {
+    const res = await fetch('http://localhost:5000/api/weather-forecast', { signal: AbortSignal.timeout(2000) })
+    if (res.ok) {
+      const data = await res.json()
+      if (!data.error) { _forecastData = data; if (_open.has('weather')) _renderWeather(); return }
+    }
+  } catch {}
+  // 2) Already have forecast from session data (spectator)
+  if (_forecastData && _open.has('weather')) _renderWeather()
+}
+
+function _renderWeather() {
+  const s = _session
+  const cloud = s.cloud_coverage ?? 0
+  const icon = WEATHER_ICONS[Math.min(cloud, 10)] || '—'
+  const sky = cloud != null ? (SKY_LABELS[cloud] || '—') : '—'
+  const grip = s.track_grip ?? s.track_grip_level
+  const gripStr = grip != null ? (GRIP_LABELS[grip] || `${grip}`) : '—'
+  const minW = s.min_wetness, maxW = s.max_wetness, avgW = s.track_wetness
+  const wetStr = (minW != null && maxW != null && Math.abs(maxW - minW) > 1) ? `${Math.round(minW)}–${Math.round(maxW)}%` : (avgW != null ? `${Math.round(avgW)}%` : '—')
+  const windSpd = s.wind_speed, windDir = s.wind_dir
+  const WIND_DIRS = ['N','NE','E','SE','S','SW','W','NW']
+  const windDirLbl = windDir != null ? WIND_DIRS[Math.round(windDir/45)%8] : ''
+  const windStr = windSpd != null ? `${windSpd} km/h ${windDirLbl}` : '—'
+
+  let forecastHTML = ''
+  if (_forecastData) {
+    const available = FC_SESSION_ORDER.filter(s => _forecastData[s])
+    if (available.length) {
+      if (!_fcSession || !_forecastData[_fcSession]) _fcSession = available[0]
+      const tabs = available.map(s =>
+        `<div class="wx-fc-tab${s===_fcSession?' active':''}" onclick="_setFcSession('${s}')">${s.charAt(0)+s.slice(1).toLowerCase()}</div>`
+      ).join('')
+
+      const sess = _forecastData[_fcSession]
+      const nodes = FC_NODE_ORDER.filter(n => sess[n])
+      const timeline = nodes.map(nk => {
+        const n = sess[nk]
+        const temp = n.WNV_TEMPERATURE ? Math.round(n.WNV_TEMPERATURE.currentValue) : '—'
+        const rain = n.WNV_RAIN_CHANCE ? Math.round(n.WNV_RAIN_CHANCE.currentValue) : 0
+        const humid = n.WNV_HUMIDITY ? Math.round(n.WNV_HUMIDITY.currentValue) : '—'
+        const rainCls = rain > 0 ? ' rain' : ''
+        return `<div class="wx-fc-node">
+          <div class="wx-fc-lbl">${FC_NODE_LABELS[nk]}</div>
+          <div class="wx-fc-row"><span class="v">${temp}°</span></div>
+          <div class="wx-fc-row${rainCls}"><span class="v">${rain}%</span> rain</div>
+          <div class="wx-fc-row"><span class="v">${humid}%</span> hum</div>
+        </div>`
+      }).join('')
+
+      forecastHTML = `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        <div style="font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Forecast</div>
+        <div class="wx-fc-tabs">${tabs}</div>
+        <div class="wx-fc-timeline">${timeline}</div>
+      </div>`
+    }
+  }
+
+  _setBody('weather', `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+      <div style="font-size:38px;line-height:1">${icon}</div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900">${s.track_temp!=null?s.track_temp+'°C':'—'}</div>
+        <div style="font-size:10px;color:var(--muted)">${sky}</div>
+      </div>
+    </div>
+    <div class="wx-grid">
+      <div class="wx-item"><div class="wx-key">Air Temp</div><div class="wx-val">${s.air_temp!=null?s.air_temp+'°C':'—'}</div></div>
+      <div class="wx-item"><div class="wx-key">Rain</div><div class="wx-val">${s.is_raining?Math.round((s.rain_intensity||0)*100)+'%':'Dry'}</div></div>
+      <div class="wx-item"><div class="wx-key">Grip</div><div class="wx-val">${gripStr}</div></div>
+      <div class="wx-item"><div class="wx-key">Wetness</div><div class="wx-val">${wetStr}</div></div>
+      <div class="wx-item"><div class="wx-key">Wind</div><div class="wx-val">${windStr}</div></div>
+    </div>
+    ${forecastHTML}`)
+}
+
+function _setFcSession(s) { _fcSession = s; _renderWeather() }
+
+// ── Flags Panel ──
+function _renderFlags() {
+  const s = _session
+  const flagState = s.flag_state, yellowState = s.yellow_flag, finishSt = s.finish_status
+  const isLastLap = _sessionMode === 'race' && s.time_remaining != null && s.time_remaining > 0 && s.time_remaining < 180
+
+  let flagClass = 'f-green', flagLabel = 'GREEN', flagColor = '#22c55e', flagDetail = 'Track is clear'
+  if (finishSt === 1) { flagClass = 'f-checkered'; flagLabel = 'CHECKERED'; flagColor = '#ccc'; flagDetail = 'Session finished' }
+  else if (yellowState > 0) { flagClass = 'f-yellow'; flagLabel = 'YELLOW'; flagColor = '#facc15'; flagDetail = 'Caution — slow down' }
+  else if (flagState === 6) { flagClass = 'f-blue'; flagLabel = 'BLUE FLAG'; flagColor = '#3b8fff'; flagDetail = 'Faster car approaching — let them pass' }
+  else if (isLastLap) { flagClass = 'f-white'; flagLabel = 'WHITE FLAG'; flagColor = '#e5e5e5'; flagDetail = 'Last lap' }
+
+  const timeStr = s.time_remaining != null ? fmtTime(s.time_remaining) : '—'
+  const lapStr = s.lap_number != null ? `Lap ${s.lap_number}` : '—'
+
+  _setBody('flags', `
+    <div class="flags-current">
+      <div class="flags-icon ${flagClass}"></div>
+      <div class="flags-label" style="color:${flagColor}">${flagLabel}</div>
+    </div>
+    <div class="flags-detail">${flagDetail}</div>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+      <div class="flags-row"><span class="flags-row-key">Session</span><span class="flags-row-val">${SESSION_LABELS[s.session_type] || '—'}</span></div>
+      <div class="flags-row"><span class="flags-row-key">Time</span><span class="flags-row-val lime">${timeStr}</span></div>
+      <div class="flags-row"><span class="flags-row-key">Lap</span><span class="flags-row-val">${lapStr}</span></div>
+      <div class="flags-row"><span class="flags-row-key">Cars</span><span class="flags-row-val">${s.num_vehicles || '—'}</span></div>
+    </div>`)
+}
+
+// ── Fuel / VE Panel ──
+function _trackFuelVE() {
+  const ve = _driver.virtual_energy ?? _session.virtual_energy
+  const fuel = _driver.fuel_liters ?? _session.fuel_liters
+  const laps = _session.lap_number
+
+  if (ve != null && laps != null && _vePrevLaps != null && laps !== _vePrevLaps && _vePrevVal != null) {
+    const consumed = _vePrevVal - ve
+    if (consumed > 0 && consumed < 50) {
+      _veHistory.push(consumed)
+      if (_veHistory.length > 10) _veHistory.shift()
+    }
+  }
+  if (ve != null) { _vePrevVal = ve; _vePrevLaps = laps }
+
+  if (fuel != null && laps != null && _fuelPrevLaps != null && laps !== _fuelPrevLaps && _fuelPrevVal != null) {
+    const consumed = _fuelPrevVal - fuel
+    if (consumed > 0 && consumed < 100) {
+      _fuelHistory.push(consumed)
+      if (_fuelHistory.length > 10) _fuelHistory.shift()
+    }
+  }
+  if (fuel != null) { _fuelPrevVal = fuel; _fuelPrevLaps = laps }
+}
+
+function _renderFuelVE() {
+  const ve = _driver.virtual_energy ?? _session.virtual_energy
+  const fuel = _driver.fuel_liters ?? _session.fuel_liters
+  const fuelPct = _session.fuel_percent
+
+  const veCol = ve != null ? (ve < 20 ? 'var(--red)' : ve < 40 ? 'var(--orange)' : 'var(--lime)') : 'var(--muted)'
+  const veStr = ve != null ? ve.toFixed(1) + '%' : '—'
+  const fuelStr = fuel != null ? fuel.toFixed(1) + ' L' : '—'
+
+  const avgVe = _veHistory.length ? (_veHistory.reduce((a,b)=>a+b,0) / _veHistory.length) : 0
+  const lastVe = _veHistory.length ? _veHistory[_veHistory.length-1] : 0
+  const avgFuel = _fuelHistory.length ? (_fuelHistory.reduce((a,b)=>a+b,0) / _fuelHistory.length) : 0
+  const lastFuel = _fuelHistory.length ? _fuelHistory[_fuelHistory.length-1] : 0
+
+  const veLapsLeft = avgVe > 0 && ve != null ? Math.floor(ve / avgVe) : '—'
+  const fuelLapsLeft = avgFuel > 0 && fuel != null ? Math.floor(fuel / avgFuel) : '—'
+
+  _setBody('fuelve', `
+    <div style="display:flex;gap:20px;margin-bottom:8px">
+      <div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Virtual Energy</div>
+        <div class="fuel-big" style="color:${veCol}">${veStr}</div>
+        <div class="fuel-bar-wrap"><div class="fuel-bar" style="width:${ve||0}%;background:${veCol}"></div></div>
+      </div>
+      <div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Fuel</div>
+        <div class="fuel-big">${fuelStr}</div>
+        ${fuelPct != null ? `<div class="fuel-sub">${fuelPct.toFixed(1)}% capacity</div>` : ''}
+      </div>
+    </div>
+    <div class="fuel-grid">
+      <div class="fuel-item"><div class="fuel-key">VE / Lap (last)</div><div class="fuel-val">${lastVe > 0 ? lastVe.toFixed(1)+'%' : '—'}</div></div>
+      <div class="fuel-item"><div class="fuel-key">VE / Lap (avg)</div><div class="fuel-val">${avgVe > 0 ? avgVe.toFixed(1)+'%' : '—'}</div></div>
+      <div class="fuel-item"><div class="fuel-key">Fuel / Lap (last)</div><div class="fuel-val">${lastFuel > 0 ? lastFuel.toFixed(2)+' L' : '—'}</div></div>
+      <div class="fuel-item"><div class="fuel-key">Fuel / Lap (avg)</div><div class="fuel-val">${avgFuel > 0 ? avgFuel.toFixed(2)+' L' : '—'}</div></div>
+      <div class="fuel-item"><div class="fuel-key">VE Laps Left</div><div class="fuel-val" style="color:${typeof veLapsLeft==='number'&&veLapsLeft<5?'var(--red)':'var(--lime)'}">${veLapsLeft}</div></div>
+      <div class="fuel-item"><div class="fuel-key">Fuel Laps Left</div><div class="fuel-val" style="color:${typeof fuelLapsLeft==='number'&&fuelLapsLeft<5?'var(--red)':'var(--lime)'}">${fuelLapsLeft}</div></div>
+    </div>`)
+}
+
+// ══════════════════ SESSION BAR ══════════════════
+
+function _updateSessionBar(s) {
+  if (!s || !Object.keys(s).length) return
+  const trackName = s.track || s.track_name || ''
+  setText('pw-s-track', trackName || '—')
+  if (trackName) document.getElementById('pw-track-logo').src = Assets.circuitLogo(trackName)
+
+  const st = s.session_type
+  if (st != null) {
+    setText('pw-s-session', SESSION_LABELS[st] || '—')
+    const newMode = (st >= 5 && st <= 8) ? 'quali' : (st >= 10) ? 'race' : ''
+    if (newMode !== _sessionMode) {
+      _sessionMode = newMode
+      if (_open.has('leaderboard')) _renderLeaderboard()
+    }
+  }
+
+  setText('pw-s-time',  s.time_remaining != null ? fmtTime(s.time_remaining) : '—')
+  setText('pw-s-lap',   s.lap_number != null ? `Lap ${s.lap_number}` : '—')
+  setText('pw-s-ttemp', s.track_temp != null ? `${s.track_temp}°C` : '—')
+  setText('pw-s-atemp', s.air_temp != null ? `${s.air_temp}°C` : '—')
+  setText('pw-s-rain',  s.is_raining ? `${Math.round((s.rain_intensity||0)*100)}%` : 'Dry')
+  setText('pw-s-cars',  s.num_vehicles != null ? `${s.num_vehicles}` : '—')
+  const grip = s.track_grip ?? s.track_grip_level
+  setText('pw-s-grip', grip != null ? (GRIP_LABELS[grip] || `${grip}`) : '—')
+  _updateFlag(s)
+}
+
+function _updateFlag(s) {
+  const el = document.getElementById('pw-s-flag')
+  const flagState = s.flag_state, yellowState = s.yellow_flag, finishSt = s.finish_status
+  const isLastLap = _sessionMode === 'race' && s.time_remaining != null && s.time_remaining > 0 && s.time_remaining < 180
+
+  if (finishSt === 1) { el.innerHTML = '<span class="pw-flag-icon f-checkered"></span> FINISH'; el.style.color = '#ccc' }
+  else if (yellowState > 0) { el.innerHTML = '<span class="pw-flag-icon f-yellow"></span> YELLOW'; el.style.color = '#facc15' }
+  else if (flagState === 6) { el.innerHTML = '<span class="pw-flag-icon f-blue"></span> BLUE'; el.style.color = '#3b8fff' }
+  else if (isLastLap) { el.innerHTML = '<span class="pw-flag-icon f-white"></span> LAST LAP'; el.style.color = '#e5e5e5' }
+  else if (flagState === 0 && s.num_vehicles > 0) { el.innerHTML = '<span class="pw-flag-icon f-green"></span> GREEN'; el.style.color = '#22c55e' }
+  else { el.innerHTML = ''; el.style.color = '' }
+}
+
+// ══════════════════ CONNECTION ══════════════════
+
+function _setStatus(s) {
+  const dot = document.getElementById('sb-conn-dot'), label = document.getElementById('sb-conn-label')
+  if (s === 'connected') { dot.className = 'on'; label.textContent = 'Live' }
+  else if (s === 'error' || s === 'disconnected') { dot.className = 'err'; label.textContent = I18n.t('connecting') + '…' }
+  else { dot.className = ''; label.textContent = I18n.t('connecting') + '…' }
+  setLiveDot(s === 'connected')
+}
+
+// ── Socket + Notification Engine ──
+const _notifier = new PitNotifier()
+
+const _handlers = {
+  onStatus(s)    { _setStatus(s) },
+  onPublisher(on){ setLiveDot(on) },
+  onSession(s) {
+    _session = s
+    _updateSessionBar(s)
+    _trackFuelVE()
+    _notifier.update(s, null, null)
+    // If track map data arrived via session and we don't have it yet, load it
+    if (!_trackData && s.track_map && Array.isArray(s.track_map) && s.track_map.length) {
+      _trackData = s.track_map
+      if (_open.has('trackmap')) _renderTrackMap()
+    }
+    // If weather forecast arrived via session, use it
+    if (s.weather_forecast && typeof s.weather_forecast === 'object' && !s.weather_forecast.error) {
+      _forecastData = s.weather_forecast
+    }
+    if (_open.has('tyres'))        _renderTyres()
+    if (_open.has('tyrtelemetry')) _renderTyrTelemetry()
+    if (_open.has('weather'))      _renderWeather()
+    if (_open.has('flags'))        _renderFlags()
+    if (_open.has('fuelve'))       _renderFuelVE()
+  },
+  onDriver(d) {
+    _driver = d
+    _trackFuelVE()
+    _notifier.update(null, d, null)
+    if (_open.has('speed'))        _renderSpeed()
+    if (_open.has('tyres'))        _renderTyres()
+    if (_open.has('tyrtelemetry')) _renderTyrTelemetry()
+    if (_open.has('fuelve'))       _renderFuelVE()
+  },
+  onStandings(s) {
+    _standings = s
+    _notifier.update(null, null, s)
+    if (_open.has('leaderboard')) _renderLeaderboard()
+    if (_open.has('trackmap'))    _renderTrackMap()
+  },
+}
+
+// ── Activate publisher if we have a lineup ──
+if (lineupId) {
+  fetch('http://localhost:5000/api/publisher/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lineup_id: lineupId })
+  }).then(r => r.json())
+    .then(d => console.log('[Publisher]', d.ok ? `Publishing to ${lineupId}` : d.error))
+    .catch(e => console.warn('[Publisher] Backend not reachable', e))
+}
+
+let socket = null;
+let currentSocketType = null;
+
+async function checkAndSwitchSocket() {
+  let hasLocalData = false;
+  let isDriving = false;
+  
+  try {
+    const r = await fetch('http://localhost:5000/api/cache', { cache: 'no-store', signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      const cache = await r.json();
+      hasLocalData = Object.keys(cache.fast || {}).length > 0;
+      isDriving = cache.slow && cache.slow.is_driving === true;
+    }
+  } catch {}
+
+  let targetType = (hasLocalData && isDriving) ? 'local' : (lineupId ? 'vps' : 'local');
+
+  if (targetType !== currentSocketType) {
+    console.info(`[Pitwall Workspace] Bascule du socket : ${currentSocketType || 'aucun'} -> ${targetType}`);
+    if (socket) {
+      socket.close();
+    }
+    currentSocketType = targetType;
+    
+    if (targetType === 'local') {
+      socket = new LocalSocket(_handlers);
+    } else {
+      socket = new PitwallSocket(lineupId, _handlers);
+    }
+    socket.connect();
+  }
+}
+
+// ── Init au chargement de la page ──
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1. Affiche le menu supérieur
+  await renderHeader(lineupId ? 'lineup' : 'local', 'pitwall-workspace');
+  if (_checkPopoutOverlay('pitwall-workspace')) return;
+  I18n.apply();
+
+  // 2. Lancement du socket dynamique
+  checkAndSwitchSocket();
+  setInterval(checkAndSwitchSocket, 3000);
+
+  // 3. Ouvrir les fenêtres par défaut du workspace
+  openPanel('leaderboard');
+  openPanel('speed');
+
+  // 4. Mettre à jour la météo toutes les 30s
+  setInterval(_loadForecast, 30000);
+});
+
+</script>
+</body>
+</html>

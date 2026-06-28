@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telemetry Library — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="telemetry-storage.js"></script>
+<script src="telemetry-vps.js"></script>
+<style>
+.tr-layout { max-width: 1200px; margin: 0 auto; padding: 20px 24px; }
+
+/* ── HEADER ── */
+.tr-hd { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; flex-wrap: wrap; gap: 12px; }
+.tr-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em;
+}
+.tr-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.tr-actions { display: flex; gap: 8px; }
+.tr-btn {
+  padding: 7px 14px; background: transparent; border: 1px solid var(--border);
+  border-radius: 3px; color: var(--muted); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  cursor: pointer; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.tr-btn:hover:not(:disabled) { border-color: var(--lime); color: var(--lime); }
+.tr-btn:disabled { opacity:.4; cursor:not-allowed }
+.tr-btn.primary { background: var(--lime); color: var(--black); border-color: var(--lime); }
+.tr-btn.primary:hover { background: #d8ff33; }
+.tr-btn.danger { color: var(--red); border-color: rgba(255,59,59,.4); }
+.tr-btn.danger:hover { background: rgba(255,59,59,.08); border-color: var(--red); }
+
+/* ── TABS ── */
+.tr-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+}
+.tr-tab {
+  padding: 10px 18px; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); background: transparent; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all .15s;
+}
+.tr-tab.active { color: var(--lime); border-bottom-color: var(--lime); }
+.tr-tab-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: var(--border); color: var(--text);
+  border-radius: 10px; font-size: 10px; font-weight: 700;
+}
+.tr-tab.active .tr-tab-badge { background: var(--lime); color: var(--black); }
+
+/* ── QUOTA BAR ── */
+.tr-quota {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 14px;
+}
+.tr-quota-text {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted);
+}
+.tr-quota-text b { color: var(--text); }
+.tr-quota-bar {
+  flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.tr-quota-fill { height: 100%; background: var(--lime); transition: width .3s, background .3s; }
+.tr-quota-fill.warn { background: var(--orange); }
+.tr-quota-fill.full { background: var(--red); }
+
+/* ── IMPORT ── */
+.tr-import {
+  background: var(--card); border: 2px dashed var(--border); border-radius: 4px;
+  padding: 22px; text-align: center; margin-bottom: 18px;
+  cursor: pointer; transition: all .2s;
+}
+.tr-import:hover,
+.tr-import.dragover { border-color: var(--lime); background: rgba(200,255,0,.03); }
+.tr-import-icon { font-size: 28px; opacity: .4; margin-bottom: 6px; }
+.tr-import-title { font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px; font-weight: 700; text-transform: uppercase; color: var(--text); }
+.tr-import-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.tr-import-formats { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+.tr-format-tag { padding: 3px 8px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2px; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+
+/* ── TABLE ── */
+.tr-table { width: 100%; border-collapse: collapse; }
+.tr-table th {
+  text-align: left; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted); padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.tr-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  font-size: 13px; vertical-align: middle;
+}
+.tr-table tr { transition: background .1s; }
+.tr-table tr:hover { background: rgba(255,255,255,.03); }
+
+.tr-file-name { font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800; font-size: 14px; color: var(--text); }
+.tr-file-sub { font-size: 11px; color: var(--muted); }
+
+.tr-tag { display: inline-block; padding: 2px 7px; border-radius: 2px;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.tr-tag.motec    { background: rgba(255,140,0,.15); color: #ff8c00; }
+.tr-tag.local    { background: rgba(200,255,0,.12); color: var(--lime); }
+.tr-tag.vps      { background: rgba(59,143,255,.15); color: var(--blue); }
+.tr-tag.both     { background: rgba(168,85,247,.15); color: #a855f7; }
+
+.tr-file-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.tr-act-btn {
+  width: 30px; height: 30px; border-radius: 3px;
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.tr-act-btn:hover { border-color: var(--lime); color: var(--lime); }
+.tr-act-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.tr-act-btn svg { width: 14px; height: 14px; }
+
+.tr-empty { color: var(--muted); font-size: 13px; padding: 32px; text-align: center;
+  border: 1px dashed var(--border); border-radius: 3px; }
+
+/* ── MODAL ── */
+.tr-modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+}
+.tr-modal-bg.show { display: flex; }
+.tr-modal {
+  background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+  padding: 22px 24px; min-width: 420px; max-width: 560px;
+}
+.tr-modal h3 { font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 900; text-transform: uppercase;
+  margin: 0 0 10px; letter-spacing: .04em; }
+.tr-modal p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+.tr-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Toast */
+#toast {
+  position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:3px;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; z-index:9999;
+  transform:translateY(20px); opacity:0; transition:transform .2s, opacity .2s;
+  pointer-events:none;
+}
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.success { background:var(--lime); color:var(--black); }
+#toast.error   { background:var(--red); color:#fff; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<header id="app-header"></header>
+
+<div class="tr-layout">
+
+  <div class="tr-hd">
+    <div>
+      <div class="tr-title">Telemetry Library</div>
+      <div class="tr-sub" id="tr-sub">LineUp: <b id="tr-lineup">—</b></div>
+    </div>
+    <div class="tr-actions">
+      <button class="tr-btn" onclick="_navigate('telemetry.html')">Live Dashboard</button>
+      <button class="tr-btn primary" onclick="_importMotec()">Import MoTeC</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tr-tabs">
+    <button class="tr-tab active" data-tab="local" onclick="_switchTab('local')">
+      Local <span class="tr-tab-badge" id="b-local">0</span>
+    </button>
+    <button class="tr-tab" data-tab="vps" onclick="_switchTab('vps')">
+      Team (VPS) <span class="tr-tab-badge" id="b-vps">0</span>
+    </button>
+  </div>
+
+  <!-- Quota bar (VPS tab only) -->
+  <div class="tr-quota" id="tr-quota" style="display:none">
+    <div class="tr-quota-text">Quota: <b><span id="q-used">0</span> / <span id="q-limit">0</span></b></div>
+    <div class="tr-quota-bar"><div class="tr-quota-fill" id="q-fill"></div></div>
+    <div class="tr-quota-text" id="q-tier">—</div>
+  </div>
+
+  <!-- Import drop zone (local tab only) -->
+  <div class="tr-import" id="tr-import" onclick="_pickFile()">
+    <div class="tr-import-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <div class="tr-import-title">Import telemetry file</div>
+    <div class="tr-import-sub">Drag &amp; drop — or click to browse</div>
+    <div class="tr-import-formats">
+      <span class="tr-format-tag">.pwtel</span>
+      <span class="tr-format-tag">.ld / .ldx</span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <table class="tr-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Track</th>
+        <th>Car</th>
+        <th>Laps</th>
+        <th>Size</th>
+        <th>Date</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tr-body"></tbody>
+  </table>
+  <div class="tr-empty" id="tr-empty" style="display:none">No recordings yet.</div>
+</div>
+
+<!-- Quota-exceeded confirmation modal -->
+<div class="tr-modal-bg" id="mod-quota">
+  <div class="tr-modal">
+    <h3>Team quota reached</h3>
+    <p id="mod-quota-msg">Your LineUp is at the limit. Delete the oldest recording to upload a new one?</p>
+    <div class="tr-modal-actions">
+      <button class="tr-btn" onclick="_closeModal('mod-quota')">Cancel</button>
+      <button class="tr-btn danger" onclick="_confirmForceUpload()">Delete oldest &amp; upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parse progress overlay (shown while the backend processes a .ld file) -->
+<div class="tr-modal-bg" id="mod-parsing">
+  <div class="tr-modal" style="text-align:center; min-width:320px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:32px 28px">
+    <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
+    <h3 style="margin:0">Parsing MoTeC file…</h3>
+    <p id="mod-parsing-msg" style="margin:0">This can take a few seconds for long stints.</p>
+  </div>
+</div>
+
+<!-- Rename modal -->
+<div class="tr-modal-bg" id="mod-rename">
+  <div class="tr-modal">
+    <h3>Rename recording</h3>
+    <input id="mod-rename-input" type="text"
+           style="width:100%; padding:8px 10px; background:var(--surface); border:1px solid var(--border);
+                  color:var(--text); border-radius:3px; font-size:14px; margin-bottom:14px"/>
+    <div class="tr-modal-actions">
+      <button class="tr-btn" onclick="_closeModal('mod-rename')">Cancel</button>
+      <button class="tr-btn primary" onclick="_submitRename()">Rename</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="tr-file-input" style="display:none"
+       accept=".pwtel,.ld,.ldx,application/json,application/octet-stream">
+<div id="toast"></div>
+
+<script>
+injectSharedCSS()
+Auth.requireAuth()
+
+const lineupId = localStorage.getItem('pw_active_lineup') || Nav.get('lineup_id') || ''
+const lineupName = Nav.get('lineup_name') || lineupId || '—'
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let currentTab   = 'local'
+let localList    = []
+let vpsList      = []
+let vpsQuota     = { used: 0, limit: 0 }
+let _pendingUpload = null   // holds {snapshot, meta} when quota exceeded
+let _renameCtx     = null   // {scope: 'local'|'vps', id, current}
+
+// ─── ICONS ───────────────────────────────────────────────────────────────
+const IC = {
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  upload:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+  open:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  edit:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  trash:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+  // NEW: JSON export icon — curly-braces glyph to make "export as .json" obvious
+  json:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H2v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>',
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await renderHeader(lineupId ? 'lineup' : 'local', 'telemetry-record')
+  if (typeof _checkPopoutOverlay === 'function' && _checkPopoutOverlay('telemetry-record')) return
+  if (typeof I18n !== 'undefined' && I18n.apply) I18n.apply()
+
+  document.getElementById('tr-lineup').textContent = lineupName
+  if (!lineupId) {
+    document.getElementById('tr-sub').innerHTML = '<span style="color:var(--red)">No LineUp selected — select one to enable VPS sync.</span>'
+  }
+
+  _setupDragDrop()
+  await _refresh()
+})
+
+// ─── TAB HANDLING ────────────────────────────────────────────────────────
+async function _switchTab(tab) {
+  currentTab = tab
+  document.querySelectorAll('.tr-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab)
+  })
+  document.getElementById('tr-quota').style.display  = tab === 'vps'   ? 'flex' : 'none'
+  document.getElementById('tr-import').style.display = tab === 'local' ? 'block' : 'none'
+  _renderTable()
+}
+
+// ─── DATA LOAD ───────────────────────────────────────────────────────────
+async function _refresh() {
+  if (lineupId) {
+    try { localList = await TelemetryStorage.list(lineupId) } catch (e) { localList = [] }
+  } else { localList = [] }
+  document.getElementById('b-local').textContent = localList.length
+
+  if (lineupId) {
+    try {
+      const res = await TelemetryVPS.list(lineupId)
+      vpsList  = res.recordings || []
+      vpsQuota = res.quota || { used: 0, limit: 0 }
+    } catch (e) {
+      vpsList  = []
+      vpsQuota = { used: 0, limit: 0 }
+    }
+  } else {
+    vpsList  = []
+    vpsQuota = { used: 0, limit: 0 }
+  }
+  document.getElementById('b-vps').textContent = vpsList.length
+  _renderQuota()
+  _renderTable()
+}
+
+function _renderQuota() {
+  document.getElementById('q-used').textContent  = vpsQuota.used
+  document.getElementById('q-limit').textContent = vpsQuota.limit
+  const pct = vpsQuota.limit ? (vpsQuota.used / vpsQuota.limit) * 100 : 0
+  const fill = document.getElementById('q-fill')
+  fill.style.width = Math.min(100, pct) + '%'
+  fill.classList.remove('warn', 'full')
+  if (pct >= 100) fill.classList.add('full')
+  else if (pct >= 80) fill.classList.add('warn')
+}
+
+// ─── RENDER TABLE ────────────────────────────────────────────────────────
+function _renderTable() {
+  const body = document.getElementById('tr-body')
+  const empty = document.getElementById('tr-empty')
+  const rows = currentTab === 'local' ? localList : vpsList
+
+  if (!rows.length) {
+    body.innerHTML = ''
+    empty.style.display = 'block'
+    return
+  }
+  empty.style.display = 'none'
+
+  body.innerHTML = rows.map(r => {
+    if (currentTab === 'local') return _rowLocal(r)
+    return _rowVPS(r)
+  }).join('')
+}
+
+function _rowLocal(r) {
+  const date = new Date(r.saved_at).toLocaleString()
+  const tag = r.name?.toLowerCase().includes('motec') || r.name?.toLowerCase().endsWith('.ld')
+    ? '<span class="tr-tag motec">MoTeC</span>' : '<span class="tr-tag local">Local</span>'
+  return `<tr>
+    <td>
+      <div class="tr-file-name">${_esc(r.name)}</div>
+      <div class="tr-file-sub">${tag} · id:${r.id.slice(0, 10)}…</div>
+    </td>
+    <td>${_esc(r.track || '—')}</td>
+    <td>${_esc(r.car   || '—')}</td>
+    <td>${r.lap_count || 0}</td>
+    <td>${_fmtSize(r.size_bytes)}</td>
+    <td>${date}</td>
+    <td>
+      <div class="tr-file-actions">
+        <button class="tr-act-btn" title="Open in analyzer" onclick="_openInAnalyzer('local','${r.id}')">${IC.open}</button>
+        <button class="tr-act-btn" title="Export as JSON"  onclick="_exportJSON('local','${r.id}','${_esc(r.name).replace(/'/g,'\\\'')}')">${IC.json}</button>
+        <button class="tr-act-btn" title="Upload to VPS"   onclick="_uploadLocal('${r.id}')">${IC.upload}</button>
+        <button class="tr-act-btn" title="Rename"          onclick="_askRename('local','${r.id}','${_esc(r.name).replace(/'/g,'\\\'')}')">${IC.edit}</button>
+        <button class="tr-act-btn danger" title="Delete"   onclick="_deleteLocal('${r.id}')">${IC.trash}</button>
+      </div>
+    </td>
+  </tr>`
+}
+
+function _rowVPS(r) {
+  const date = new Date((r.created_at || 0) * 1000).toLocaleString()
+  const isLocal = localList.some(l => l.id === r.id)
+  const tag = isLocal ? '<span class="tr-tag both">Synced</span>' : '<span class="tr-tag vps">VPS</span>'
+  return `<tr>
+    <td>
+      <div class="tr-file-name">${_esc(r.name)}</div>
+      <div class="tr-file-sub">${tag} · by ${_esc((r.uploader_id || '').slice(0, 10))}</div>
+    </td>
+    <td>${_esc(r.track || '—')}</td>
+    <td>${_esc(r.car   || '—')}</td>
+    <td>${r.lap_count || 0}</td>
+    <td>${_fmtSize(r.size_bytes)}</td>
+    <td>${date}</td>
+    <td>
+      <div class="tr-file-actions">
+        <button class="tr-act-btn" title="Open in analyzer" onclick="_openInAnalyzer('vps','${r.id}')">${IC.open}</button>
+        <button class="tr-act-btn" title="Download to local" onclick="_downloadVPS('${r.id}','${_esc(r.name).replace(/'/g,'\\\'')}')">${IC.download}</button>
+        <button class="tr-act-btn" title="Export as JSON"   onclick="_exportJSON('vps','${r.id}','${_esc(r.name).replace(/'/g,'\\\'')}')">${IC.json}</button>
+        <button class="tr-act-btn" title="Rename"           onclick="_askRename('vps','${r.id}','${_esc(r.name).replace(/'/g,'\\\'')}')">${IC.edit}</button>
+        <button class="tr-act-btn danger" title="Delete"    onclick="_deleteVPS('${r.id}')">${IC.trash}</button>
+      </div>
+    </td>
+  </tr>`
+}
+
+// ─── IMPORT (.pwtel / .ld / .ldx) ────────────────────────────────────────
+function _pickFile() { document.getElementById('tr-file-input').click() }
+document.getElementById('tr-file-input').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0]; if (!file) return
+  await _handleFile(file)
+  ev.target.value = ''
+})
+
+function _setupDragDrop() {
+  const zone = document.getElementById('tr-import')
+  zone.addEventListener('dragover',  (e) => { e.preventDefault(); zone.classList.add('dragover') })
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'))
+  zone.addEventListener('drop',      async (e) => {
+    e.preventDefault(); zone.classList.remove('dragover')
+    const file = e.dataTransfer.files[0]; if (file) await _handleFile(file)
+  })
+}
+
+async function _handleFile(file) {
+  if (!lineupId) { _toast('Select a LineUp first', 'error'); return }
+  const name = file.name.toLowerCase()
+  try {
+    if (name.endsWith('.pwtel') || name.endsWith('.json')) {
+      const text = await file.text()
+      // Validate
+      JSON.parse(text)
+      const recId = 'rec_' + _randId()
+      const r = await TelemetryStorage.save(lineupId, JSON.parse(text), {
+        recId, name: file.name.replace(/\.(pwtel|json)$/i, ''),
+      })
+      _toast(`Imported ${Math.round(r.size_bytes/1024)} KB`, 'success')
+    } else if (name.endsWith('.ld') || name.endsWith('.ldx')) {
+      // MoTeC files go to the local backend for parsing (requires /api/telemetry/parse_motec).
+      await _importMotecFile(file)
+    } else {
+      _toast('Unsupported format', 'error'); return
+    }
+    await _refresh()
+  } catch (err) {
+    console.error(err)
+    _toast('Import failed: ' + err.message, 'error')
+  }
+}
+
+// FIX: MoTeC .ld/.ldx import now goes through the Electron IPC bridge instead
+// of a hard-coded http://localhost:5000 fetch. The previous implementation
+// exposed the parser over HTTP on every user's machine (CSRF / CORS surface)
+// and broke outright when the Python daemon wasn't running. The new bridge
+// (telemetry:parseMotec) runs the parser in-process via the main process,
+// keeping the attack surface zero and surviving packaged builds.
+async function _importMotecFile(file) {
+  _showParsing(`Parsing ${file.name}…`)
+  try {
+    const buf = await file.arrayBuffer()
+    _setParsingMsg(`Parsing ${Math.round(buf.byteLength/1024)} KB…`)
+    // NEW: IPC call — main process handles the ldparser subprocess and
+    // returns a snapshot object (version, laps:[{lap_num, samples}], ...)
+    // identical to what TelemetryBuffer.snapshot() produces.
+    const snapshot = await TelemetryStorage.parseMotec(buf, file.name)
+    if (!snapshot || !snapshot.laps) throw new Error('Parser returned no laps')
+
+    _setParsingMsg('Decoding laps…')
+    _setParsingMsg('Saving locally…')
+    const recId = 'rec_' + _randId()
+    await TelemetryStorage.save(lineupId, snapshot, {
+      recId,
+      name:  file.name.replace(/\.(ld|ldx)$/i, ''),
+      track: snapshot.track || '',
+      car:   snapshot.car   || '',
+    })
+  } finally {
+    _hideParsing()
+  }
+}
+
+function _showParsing(msg) {
+  const el = document.getElementById('mod-parsing')
+  document.getElementById('mod-parsing-msg').textContent = msg || 'This can take a few seconds…'
+  el.classList.add('show')
+}
+function _setParsingMsg(msg) {
+  const el = document.getElementById('mod-parsing-msg')
+  if (el) el.textContent = msg
+}
+function _hideParsing() {
+  document.getElementById('mod-parsing').classList.remove('show')
+}
+
+async function _importMotec() { _pickFile() }
+
+// ─── LOCAL ACTIONS ───────────────────────────────────────────────────────
+async function _deleteLocal(recId) {
+  if (!confirm('Delete this local recording?')) return
+  try {
+    await TelemetryStorage.remove(lineupId, recId)
+    _toast('Deleted', 'success')
+    await _refresh()
+  } catch (e) { _toast('Delete failed: ' + e.message, 'error') }
+}
+
+async function _uploadLocal(recId) {
+  try {
+    const snap = await TelemetryStorage.load(lineupId, recId)
+    const meta = {
+      name:         snap.meta?.name  || 'Recording',
+      track:        snap.track       || snap.meta?.track || '',
+      car:          snap.car         || snap.meta?.car   || '',
+      lap_count:    snap.lap_count   || 0,
+      duration_sec: snap.duration_sec || 0,
+    }
+    const json = JSON.stringify(snap)
+    try {
+      const r = await TelemetryVPS.upload(lineupId, json, meta)
+      _toast(`Uploaded (${Math.round(r.size_bytes/1024)} KB)`, 'success')
+      await _refresh()
+    } catch (err) {
+      if (err.status === 409 && err.data) {
+        _pendingUpload = { lineupId, json, meta }
+        _openQuotaModal(err.data)
+      } else {
+        throw err
+      }
+    }
+  } catch (e) { _toast('Upload failed: ' + e.message, 'error') }
+}
+
+async function _downloadVPS(recId, name) {
+  try {
+    const buf = await TelemetryVPS.download(recId)
+    // Try JSON first
+    const text = new TextDecoder().decode(buf)
+    let snap = null
+    try { snap = JSON.parse(text) } catch {}
+    if (snap) {
+      await TelemetryStorage.save(lineupId, snap, { recId, name })
+    } else {
+      await TelemetryStorage.importRaw(lineupId, recId, new Uint8Array(buf))
+    }
+    _toast('Downloaded locally', 'success')
+    await _refresh()
+  } catch (e) { _toast('Download failed: ' + e.message, 'error') }
+}
+
+async function _deleteVPS(recId) {
+  if (!confirm('Delete this recording from the team VPS?')) return
+  try {
+    await TelemetryVPS.remove(recId)
+    _toast('Deleted from VPS', 'success')
+    await _refresh()
+  } catch (e) { _toast('Delete failed: ' + e.message, 'error') }
+}
+
+// NEW: Export a recording as a .json file the user can inspect externally
+// (useful to see available channels, e.g. for wiring new math formulas).
+//   - scope = 'local' → load from TelemetryStorage
+//   - scope = 'vps'   → download raw bytes; if they already are JSON, pretty-
+//                       print them; otherwise wrap the binary in a minimal
+//                       stub so the user still gets *something* they can open.
+// The JSON is pretty-printed (2-space indent) so it's human-readable.
+async function _exportJSON(scope, recId, fileName) {
+  try {
+    let snap
+    if (scope === 'vps') {
+      const buf = await TelemetryVPS.download(recId)
+      const text = new TextDecoder().decode(buf)
+      try {
+        snap = JSON.parse(text)
+      } catch {
+        _toast('This VPS file is not JSON (raw .pwtel). Download it locally first.', 'error')
+        return
+      }
+    } else {
+      snap = await TelemetryStorage.load(lineupId, recId)
+    }
+
+    const json = JSON.stringify(snap, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+
+    // Derive a clean filename: strip extension from the source name, append .json.
+    const base = (fileName || snap.meta?.name || 'recording').replace(/\.(ld|ldx|pwtel|json)$/i, '')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = base + '.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    // Let the download start before revoking — 1 s is plenty.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    _toast(`Exported ${base}.json (${Math.round(blob.size / 1024)} KB)`, 'success')
+  } catch (e) {
+    _toast('Export failed: ' + e.message, 'error')
+  }
+}
+
+function _openInAnalyzer(scope, recId) {
+  const url = `telemetry-analyse.html?scope=${scope}&rec_id=${encodeURIComponent(recId)}`
+  _navigate(url)
+}
+
+// ─── QUOTA MODAL ─────────────────────────────────────────────────────────
+function _openQuotaModal(info) {
+  const msg = info?.oldest?.name
+    ? `Quota reached (${info.used}/${info.limit}). The oldest recording is "${info.oldest.name}". Delete it and upload the new one?`
+    : `Quota reached (${info.used}/${info.limit}). Delete the oldest recording and upload the new one?`
+  document.getElementById('mod-quota-msg').textContent = msg
+  document.getElementById('mod-quota').classList.add('show')
+}
+function _closeModal(id) { document.getElementById(id).classList.remove('show') }
+
+async function _confirmForceUpload() {
+  _closeModal('mod-quota')
+  if (!_pendingUpload) return
+  try {
+    const { lineupId: lid, json, meta } = _pendingUpload
+    const r = await TelemetryVPS.upload(lid, json, { ...meta, force: 1 })
+    _toast(`Uploaded (oldest removed, ${Math.round(r.size_bytes/1024)} KB)`, 'success')
+    _pendingUpload = null
+    await _refresh()
+  } catch (e) { _toast('Upload failed: ' + e.message, 'error') }
+}
+
+// ─── RENAME ──────────────────────────────────────────────────────────────
+function _askRename(scope, id, current) {
+  _renameCtx = { scope, id, current }
+  const input = document.getElementById('mod-rename-input')
+  input.value = current
+  document.getElementById('mod-rename').classList.add('show')
+  setTimeout(() => input.focus(), 50)
+}
+
+async function _submitRename() {
+  if (!_renameCtx) return
+  const newName = document.getElementById('mod-rename-input').value.trim()
+  if (!newName) return
+  const { scope, id, current } = _renameCtx
+  _closeModal('mod-rename')
+  try {
+    if (scope === 'vps') {
+      await TelemetryVPS.rename(id, { name: newName })
+    } else {
+      const snap = await TelemetryStorage.load(lineupId, id)
+      snap.meta = snap.meta || {}
+      snap.meta.name = newName
+      await TelemetryStorage.save(lineupId, snap, { recId: id, name: newName })
+    }
+    _toast('Renamed', 'success')
+    await _refresh()
+  } catch (e) { _toast('Rename failed: ' + e.message, 'error') }
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────
+function _fmtSize(b) {
+  if (!b) return '0'
+  if (b < 1024)           return b + ' B'
+  if (b < 1024 * 1024)    return (b / 1024).toFixed(1) + ' KB'
+  return (b / 1024 / 1024).toFixed(2) + ' MB'
+}
+function _randId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let s = ''
+  for (let i = 0; i < 12; i++) s += chars[Math.floor(Math.random() * chars.length)]
+  return s
+}
+function _esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]))
+}
+
+function _toast(msg, kind = 'success') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = 'show ' + kind
+  clearTimeout(el._t)
+  el._t = setTimeout(() => { el.className = kind }, 2500)
+}
+</script>
+</body>
+</html>

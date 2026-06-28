@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="pitwall.js"></script>
+<script src="sidebar.js"></script>
+<style>
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #111111;
+  --sidebar:  #161616;
+  --card:     #222222;
+  --card-hover: #2a2a2a;
+  --green:    #A3E635;
+  --green-dark: #4d7c0f;
+  --text:     #FFFFFF;
+  --muted:    #A1A1AA;
+  --border:   #333333;
+  --red:      #EF4444;
+  --orange:   #D97706;
+  --lime:     #A3E635;
+  --surface:  #1a1a1a;
+  --black:    #000000;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ── LAYOUT ── */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  z-index: 10;
+  padding: 16px 40px 80px;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 20px 40px;
+  gap: 12px;
+}
+
+.topbar-btn {
+  padding: 10px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-btn:hover {
+  background: rgba(0,0,0,0.6);
+  color: var(--text);
+}
+
+.page-content { max-width:1100px; margin:0 auto; }
+
+/* ── HERO ── */
+.team-hero { display:flex; align-items:flex-start; justify-content:space-between;
+  gap:20px; margin-bottom:32px; flex-wrap:wrap; margin-top: 16px; }
+.team-hero-name { font-family:'Barlow Condensed',sans-serif; font-size:42px; font-weight:900;
+  text-transform:uppercase; line-height:1; }
+.team-hero-meta { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+.team-code-block { text-align:right; }
+.team-code-label { font-size:10px; color:var(--muted); letter-spacing:.15em; text-transform:uppercase; }
+.team-code-val { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:900;
+  color:var(--lime); letter-spacing:.15em; cursor:pointer; transition:opacity .15s; }
+.team-code-val:hover { opacity:.7; }
+.copy-hint { font-size:9px; color:var(--muted); margin-top:2px; letter-spacing:.1em; text-transform:uppercase; }
+
+/* ── TAGS ── */
+.tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+}
+.tag-lime { background: rgba(163,230,53,0.1); border: 1px solid rgba(163,230,53,0.3); color: var(--green); }
+.tag-blue { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa; }
+.tag-gray { background: rgba(161,161,170,0.1); border: 1px solid rgba(161,161,170,0.3); color: var(--muted); }
+
+/* ── STATS ── */
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+.stat-card { padding:24px; text-align:center; background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+.stat-key { font-size:10px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.stat-val { font-family:'Barlow Condensed',sans-serif; font-size:32px; font-weight:900; }
+.stat-val.lime { color:var(--lime); }
+
+/* ── TABS ── */
+.tab-bar { display:flex; gap:24px; margin-bottom:24px; border-bottom:1px solid var(--border); }
+.tab-btn { font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted); background:none; border:none;
+  padding:12px 0; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .15s, border-color .15s; }
+.tab-btn:hover { color:var(--text); }
+.tab-btn.active { color:var(--lime); border-bottom-color:var(--lime); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── EVENTS (Spotify grid) ── */
+.events-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.event-card {
+  aspect-ratio:4/3; border-radius:16px; padding:16px; cursor:pointer;
+  transition:all .3s; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:flex-end;
+  background:var(--card); border: 1px solid var(--border);
+}
+.event-card:hover { border-color: rgba(163,230,53,0.5); transform:scale(1.02); }
+.event-card-bg { position:absolute; inset:0; background-size:cover; background-position:center;
+  opacity:.5; transition:opacity .3s; pointer-events:none; }
+.event-card:hover .event-card-bg { opacity:.7; }
+.event-card-content { position:relative; z-index:1; }
+.event-name { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:900;
+  text-transform:uppercase; margin-bottom:4px; line-height:1.2;
+  text-shadow:0 2px 8px rgba(0,0,0,.8); }
+.event-circuit { font-size:13px; color:var(--text); font-weight:600; text-transform:uppercase;
+  letter-spacing:.05em; text-shadow:0 1px 4px rgba(0,0,0,.8); margin-bottom:2px; }
+.event-meta { font-size:11px; color:var(--muted); text-shadow:0 1px 4px rgba(0,0,0,.8); }
+.event-tags { display:flex; gap:6px; margin-top:8px; }
+.event-tag { padding:4px 8px; background:rgba(0,0,0,.6); border-radius:4px; font-size:10px;
+  font-weight:700; text-transform:uppercase; letter-spacing:.05em; backdrop-filter:blur(10px);
+  color:var(--lime); border:1px solid rgba(200,255,0,.3); }
+.event-actions { position:absolute; top:10px; right:10px; display:flex; gap:4px; opacity:0;
+  transition:opacity .15s; z-index:2; }
+.event-card:hover .event-actions { opacity:1; }
+.icon-btn { width:28px; height:28px; border-radius:4px; border:1px solid rgba(255,255,255,.2);
+  background:rgba(0,0,0,.5); color:rgba(255,255,255,.7); font-size:12px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+  backdrop-filter:blur(10px); }
+.icon-btn:hover { border-color:var(--lime); color:var(--lime); background:rgba(0,0,0,.7); }
+.icon-btn.danger:hover { border-color:var(--red); color:var(--red); }
+.add-card {
+  aspect-ratio:4/3; background:transparent; border:2px dashed var(--border); border-radius:16px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  cursor:pointer; transition:all .3s;
+}
+.add-card:hover { border-color:var(--lime); background:rgba(200,255,0,.05); }
+.add-card:hover .add-icon { color:var(--lime); }
+.add-card:hover .add-label { color:var(--lime); }
+.add-icon { font-size:32px; color:var(--muted); transition:color .3s; }
+.add-label { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--muted); transition:color .3s; }
+
+/* ── DRIVERS TABLE ── */
+.card-table { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+.members-table { width:100%; border-collapse:collapse; }
+.members-table th { font-size:10px; font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--muted); padding:16px 20px; border-bottom:1px solid var(--border); text-align:left; }
+.members-table td { padding:16px 20px; border-bottom:1px solid rgba(34,34,34,.5); vertical-align:middle; }
+.members-table tr:last-child td { border-bottom: none; }
+.members-table tr:hover td { background:var(--card-hover); }
+.driver-avatar-sm { width:32px; height:32px; border-radius:8px; background:var(--border); object-fit:cover; }
+.driver-name-cell { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:600; }
+.member-actions { display:flex; gap:6px; }
+
+/* Role icon */
+.role-icon { width:14px; height:14px; opacity:.5; filter:brightness(0) invert(1);
+  vertical-align:middle; margin-right:5px; }
+
+/* Role selector */
+.role-select { background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-family:'Barlow',sans-serif; font-size:13px; font-weight:500;
+  padding:6px 12px; border-radius:6px;
+  cursor:pointer; outline:none; transition:border-color .15s; }
+.role-select:focus { border-color:var(--lime); }
+.role-select:disabled { opacity:.4; cursor:not-allowed; }
+
+/* Lineup access in driver row */
+.lineup-chips { display:flex; gap:4px; flex-wrap:wrap; }
+.lineup-chip { font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(163,230,53,.08);
+  color:var(--lime); border:1px solid rgba(163,230,53,.3); font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase; }
+
+/* ── SETTINGS ── */
+.settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:740px; }
+.settings-section { padding:24px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+.settings-section-title { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.1em; color:var(--lime);
+  margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+
+.form-group { margin-bottom: 20px; }
+.form-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+.form-input { width: 100%; padding: 12px 16px; background: #111; border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px; transition: border-color 0.2s; }
+.form-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(163,230,53,0.15); }
+
+/* Danger zone */
+.danger-zone { border:1px solid rgba(255,59,59,.25); padding:24px; border-radius:20px; background: rgba(239,68,68,0.02); }
+.danger-zone .settings-section-title { color:var(--red); border-bottom-color: rgba(255,59,59,.2); }
+.danger-desc { font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.6; }
+
+/* ── LEAVE CONFIRM INPUT ── */
+.confirm-input-wrap { margin:14px 0 4px; }
+.confirm-input { background:#111; border:1px solid var(--red); border-radius:10px;
+  color:var(--text); font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700;
+  letter-spacing:.15em; text-transform:uppercase; padding:12px 16px; width:100%; outline:none;
+  transition:box-shadow .15s; }
+.confirm-input:focus { box-shadow:0 0 0 2px rgba(255,59,59,.3); }
+.confirm-input::placeholder { color:var(--border); font-size:14px; letter-spacing:.05em; }
+
+/* ── BUTTONS ── */
+.btn-primary { background: var(--green); color: #000; padding: 11px 22px; border-radius: 999px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.2s; border: none; }
+.btn-primary:hover { background: #b0f040; transform: scale(1.04); }
+.btn-ghost { background: transparent; color: var(--muted); padding: 11px 22px; border-radius: 999px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--text); }
+.btn-danger { background: rgba(239,68,68,0.1); color: var(--red); padding: 11px 22px; border-radius: 999px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(239,68,68,0.3); }
+.btn-danger:hover { background: var(--red); color: #000; }
+
+/* ── MODALS ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 1000; }
+.modal-overlay.active { display: flex; }
+.modal { background: #1a1a1a; border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 90%; max-width: 440px; box-shadow: 0 24px 64px rgba(0,0,0,0.6); }
+.modal-title { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 24px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 28px; }
+
+/* ── TOAST ── */
+#toast { position:fixed; bottom:24px; right:24px; padding:12px 24px; border-radius:10px;
+  font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; z-index:9999;
+  transform:translateY(20px); opacity:0; transition:transform .2s, opacity .2s; pointer-events:none; }
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.success { background:var(--lime); color:var(--black); box-shadow: 0 4px 12px rgba(163,230,53,0.3); }
+#toast.error   { background:var(--red); color:#fff; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+
+/* ── LOADING ── */
+.connecting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 24px 0;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<aside id="app-sidebar"></aside>
+
+<div class="app-shell">
+  <main class="main-content">
+    
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="topbar-btn" onclick="goLocal()" title="Local Mode">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      </button>
+      <button class="topbar-btn" style="position:relative" title="Notifications">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        <span class="topbar-notif-dot"></span>
+      </button>
+      <button class="topbar-btn" id="topbar-user-btn" onclick="window.location.href='main-settings.html'">
+        <div id="topbar-avatar-wrap" style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:6px;background:var(--border);"></div>
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+      </button>
+    </header>
+
+    <div class="scroll-area">
+      <div class="page-content">
+
+        <!-- Hero -->
+        <div class="team-hero">
+          <div>
+            <div class="team-hero-name" id="team-name">—</div>
+            <div class="team-hero-meta" id="team-meta"></div>
+          </div>
+          <div class="team-code-block">
+            <div class="team-code-label" data-i18n="teamCode">Team Code</div>
+            <div class="team-code-val" id="team-code" onclick="copyCode()" title="Click to copy">—</div>
+            <div class="copy-hint" id="copy-hint" data-i18n="clickToCopy">Click to copy</div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-key" data-i18n="members">Members</div><div class="stat-val lime" id="stat-members">—</div></div>
+          <div class="stat-card"><div class="stat-key" data-i18n="events">Events</div><div class="stat-val" id="stat-events">—</div></div>
+          <div class="stat-card"><div class="stat-key" data-i18n="lineups">Lineups</div><div class="stat-val" id="stat-lineups">—</div></div>
+          <div class="stat-card"><div class="stat-key" data-i18n="tier">Tier</div><div class="stat-val" id="stat-tier" style="font-size:20px">—</div></div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="races"    onclick="switchTab('races',this)"    data-i18n="races">Races</button>
+          <button class="tab-btn"        data-tab="drivers"  onclick="switchTab('drivers',this)"  data-i18n="drivers">Drivers</button>
+          <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings',this)" data-i18n="settings">Settings</button>
+        </div>
+
+        <!-- Tab: Races -->
+        <div id="tab-races" class="tab-content active">
+          <div id="events-grid" class="events-grid">
+            <div class="connecting"><div class="spinner"></div>Loading</div>
+          </div>
+        </div>
+
+        <!-- Tab: Drivers -->
+        <div id="tab-drivers" class="tab-content">
+          <div class="card-table">
+            <table class="members-table">
+              <thead>
+                <tr>
+                  <th style="width:52px"></th>
+                  <th data-i18n="driver">Driver</th>
+                  <th data-i18n="role">Role</th>
+                  <th data-i18n="lineupAccess">Lineup Access</th>
+                  <th data-i18n="since">Since</th>
+                  <th style="width:80px"></th>
+                </tr>
+              </thead>
+              <tbody id="members-body">
+                <tr><td colspan="6"><div class="connecting"><div class="spinner"></div>Loading</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab: Settings -->
+        <div id="tab-settings" class="tab-content">
+          <div class="settings-grid">
+            <!-- General -->
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="general">General</div>
+              <div class="form-group">
+                <div class="form-label" data-i18n="teamName">Team name</div>
+                <input class="form-input" id="s-name" type="text" placeholder="My Racing Team">
+              </div>
+              <div class="form-group" style="opacity:.5">
+                <div class="form-label" data-i18n="tier">Tier</div>
+                <input class="form-input" id="s-tier" type="text" disabled>
+              </div>
+              <button class="btn-primary" onclick="saveTeamName()" data-i18n="saveChanges">Save changes</button>
+            </div>
+
+            <!-- Team Code -->
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="inviteCode">Invite code</div>
+              <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6" data-i18n="inviteCodeDesc">
+                Share this code with anyone you want to invite to your team. They can enter it from the Dashboard → Join a team.
+              </p>
+              <div style="display:flex;gap:12px;align-items:center">
+                <div id="s-code-display" style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--lime);letter-spacing:.2em">—</div>
+                <button class="btn-ghost" onclick="copyCode()" data-i18n="copy">Copy</button>
+              </div>
+            </div>
+
+            <!-- Team Logo -->
+            <div class="settings-section" id="logo-section" style="display:none">
+              <div class="settings-section-title" data-i18n="teamLogo">Team Logo</div>
+              <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6" id="logo-section-desc"></p>
+              <div id="logo-uploader-wrap"></div>
+            </div>
+
+            <!-- Danger zone — full width -->
+            <div class="danger-zone" style="grid-column:1/-1">
+              <div class="settings-section-title" data-i18n="dangerZone">Danger zone</div>
+              <p class="danger-desc">Leaving a team removes you from all its lineups. If you are the founder, this will <strong style="color:var(--red)">permanently delete</strong> the team and all its data. This action cannot be undone.</p>
+              <button class="btn-danger" onclick="confirmLeaveTeam()" data-i18n="leaveTeam">Leave / Delete team</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /scroll-area -->
+  </main>
+</div><!-- /app-shell -->
+
+<!-- ── MODALS ── -->
+
+<!-- Create Event -->
+<div class="modal-overlay" id="modal-create-event" onclick="if(event.target===this)hideModal('modal-create-event')">
+  <div class="modal">
+    <div class="modal-title" data-i18n="newEvent">New Event</div>
+    <div class="form-group"><div class="form-label" data-i18n="eventName">Event name *</div>
+      <input class="form-input" id="ce-name" type="text" placeholder="24H Le Mans 2026"></div>
+    <div class="form-group"><div class="form-label" data-i18n="circuit">Circuit</div>
+      <input class="form-input" id="ce-circuit" type="text" placeholder="Circuit de la Sarthe"></div>
+    <div class="form-group"><div class="form-label" data-i18n="series">Series / Championship</div>
+      <input class="form-input" id="ce-series" type="text" placeholder="FIA WEC"></div>
+    <div class="form-group"><div class="form-label" data-i18n="notes">Notes</div>
+      <textarea class="form-input" id="ce-notes" placeholder="Optional notes..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="hideModal('modal-create-event')" data-i18n="cancel">Cancel</button>
+      <button class="btn-primary" onclick="submitCreateEvent()" data-i18n="create">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Event -->
+<div class="modal-overlay" id="modal-edit-event" onclick="if(event.target===this)hideModal('modal-edit-event')">
+  <div class="modal">
+    <div class="modal-title" data-i18n="edit">Edit Event</div>
+    <input type="hidden" id="ee-id">
+    <div class="form-group"><div class="form-label" data-i18n="eventName">Event name *</div>
+      <input class="form-input" id="ee-name" type="text"></div>
+    <div class="form-group"><div class="form-label" data-i18n="circuit">Circuit</div>
+      <input class="form-input" id="ee-circuit" type="text"></div>
+    <div class="form-group"><div class="form-label" data-i18n="series">Series / Championship</div>
+      <input class="form-input" id="ee-series" type="text"></div>
+    <div class="form-group"><div class="form-label" data-i18n="notes">Notes</div>
+      <textarea class="form-input" id="ee-notes"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="hideModal('modal-edit-event')" data-i18n="cancel">Cancel</button>
+      <button class="btn-primary" onclick="saveEvent()" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete event -->
+<div class="modal-overlay" id="modal-delete-event" onclick="if(event.target===this)hideModal('modal-delete-event')">
+  <div class="modal">
+    <div class="modal-title">Delete Event</div>
+    <input type="hidden" id="del-event-id">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:6px">Are you sure you want to delete <strong id="del-event-name" style="color:var(--text)"></strong>?</p>
+    <p style="font-size:12px;color:var(--red);margin-bottom:20px">This will also delete all lineups linked to this event. This action is irreversible.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="hideModal('modal-delete-event')">Cancel</button>
+      <button class="btn-danger" onclick="deleteEvent()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm remove member -->
+<div class="modal-overlay" id="modal-remove-member" onclick="if(event.target===this)hideModal('modal-remove-member')">
+  <div class="modal">
+    <div class="modal-title">Remove Driver</div>
+    <input type="hidden" id="rm-user-id">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Remove <strong id="rm-user-name" style="color:var(--text)"></strong> from the team? They will lose access to all lineups.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="hideModal('modal-remove-member')">Cancel</button>
+      <button class="btn-danger" onclick="removeMember()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm leave / delete team (founder) -->
+<div class="modal-overlay" id="modal-leave-team" onclick="if(event.target===this)hideModal('modal-leave-team')">
+  <div class="modal">
+    <div class="modal-title" id="leave-modal-title">Leave Team</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.6" id="leave-modal-desc"></p>
+    <div class="confirm-input-wrap" id="leave-confirm-wrap" style="display:none">
+      <div class="form-label" style="margin-bottom:6px;color:var(--red)">Type DELETE to confirm</div>
+      <input class="confirm-input" id="leave-confirm-input" type="text" placeholder="DELETE" autocomplete="off"
+        oninput="document.getElementById('leave-confirm-btn').disabled = this.value !== 'DELETE'">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="hideModal('modal-leave-team')">Cancel</button>
+      <button class="btn-danger" id="leave-confirm-btn" onclick="executeLeaveTeam()">Leave</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw ''
+
+const teamId = Nav.getParam('team_id')
+if (!teamId) { location.href = 'main.html'; throw '' }
+
+// New sidebar layout
+renderSidebar('home', 'team')
+I18n.apply()
+
+// ── STATE ──
+let currentRole = 'driver'
+let teamData    = {}
+let membersData = []
+let eventsData  = []
+let lineupsData = []
+
+function activeTabId() {
+  const hash = location.hash.replace('#','')
+  return ['races','drivers','settings'].includes(hash) ? hash : 'races'
+}
+
+// ── TABS ──
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById(`tab-${tab}`).classList.add('active')
+  btn.classList.add('active')
+  history.pushState(null,'',`#${tab}`)
+}
+
+// ── LOAD ──
+async function load() {
+  const res = await fetch(`${API}/api/teams/${teamId}?token=${Auth.getToken()}`)
+  if (!res.ok) { location.href='main.html'; return }
+  const data = await res.json()
+  const { team, members, events: evts, lineups, limits, role } = data
+
+  teamData    = team
+  membersData = members  || []
+  eventsData  = evts     || []
+  lineupsData = lineups  || []
+  currentRole = role
+
+  Nav.set('team_name', team.name)
+
+  // Hero
+  setText('team-name', team.name)
+  setText('team-code', (team.code||'').toUpperCase())
+  document.getElementById('s-code-display').textContent = (team.code||'').toUpperCase()
+  document.getElementById('team-meta').innerHTML = `
+    <span class="tag tag-lime">${{free:'Free',pro:'Pro',max:'Max'}[team.tier]||team.tier}</span>
+    <span class="tag tag-gray">${esc(role)}</span>`
+
+  // Stats
+  setText('stat-members', membersData.length)
+  setText('stat-events',  eventsData.length)
+  setText('stat-lineups', lineupsData.length)
+  const tierLabel = {free:'FREE',pro:'PRO',max:'MAX'}[team.tier]||team.tier
+  const tierEl = document.getElementById('stat-tier')
+  tierEl.textContent = tierLabel
+  tierEl.style.color = team.tier === 'free' ? 'var(--muted)' : 'var(--lime)'
+
+  // Settings fields
+  document.getElementById('s-name').value = team.name
+  document.getElementById('s-tier').value = tierLabel
+
+  // ── Team logo section (founder/manager only, or pro/max tier) ──
+  const canEditLogo = ['founder','manager'].includes(role) && team.tier !== 'free'
+  const canViewLogo = !!Assets.getTeamLogo(teamId)
+  const logoSection = document.getElementById('logo-section')
+  if (canEditLogo || canViewLogo) {
+    logoSection.style.display = ''
+    document.getElementById('logo-section-desc').textContent = I18n.t('logoDesc')
+    document.getElementById('logo-uploader-wrap').innerHTML = renderLogoUploader(teamId, canEditLogo)
+  }
+
+  // ── Also inject logo in hero ──
+  const heroLogoExisting = document.getElementById('hero-team-logo')
+  if (heroLogoExisting) heroLogoExisting.remove()
+  const heroLogo = Assets.getTeamLogo(teamId)
+  if (heroLogo) {
+    const img = document.createElement('img')
+    img.id = 'hero-team-logo'
+    img.src = heroLogo
+    img.alt = 'Team logo'
+    img.style.cssText = 'height:52px;width:auto;object-fit:contain;border-radius:4px;background:var(--surface);padding:4px;border:1px solid var(--border)'
+    document.querySelector('.team-hero').appendChild(img)
+  }
+
+  renderEvents()
+  renderMembers()
+
+  // Activate correct tab from hash
+  const hash = location.hash.replace('#','')
+  if (['races','drivers','settings'].includes(hash)) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${hash}"]`)
+    if (btn) switchTab(hash, btn)
+  }
+}
+
+// ── EVENTS ──
+function renderEvents() {
+  const isManager = ['founder','manager'].includes(currentRole)
+  const grid = document.getElementById('events-grid')
+
+  const evtsHTML = eventsData.map(e => {
+    const bg = Assets.circuitBackground(e.circuit || e.name)
+    const bgStyle = bg ? `background-image:url('${bg}')` : ''
+    return `
+    <div class="event-card" onclick="Nav.goEvent('${esc(e.id)}','${esc(e.name)}')">
+      <div class="event-card-bg" style="${bgStyle}"></div>
+      <div class="event-card-content">
+        <div class="event-name">${esc(e.name)}</div>
+        <div class="event-circuit">${esc(e.circuit||'')}</div>
+        ${e.series ? `<div class="event-tags"><span class="event-tag">${esc(e.series)}</span></div>` : ''}
+      </div>
+      ${isManager ? `
+        <div class="event-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" title="Edit" onclick="openEditEvent('${esc(e.id)}','${esc(e.name)}','${esc(e.circuit||'')}','${esc(e.series||'')}','${esc(e.notes||'')}')">✎</button>
+          <button class="icon-btn danger" title="Delete" onclick="openDeleteEvent('${esc(e.id)}','${esc(e.name)}')">✕</button>
+        </div>` : ''}
+    </div>`
+  }).join('')
+
+  const addHTML = isManager ? `
+    <div class="add-card" onclick="showModal('modal-create-event')">
+      <div class="add-icon">＋</div>
+      <div class="add-label">${I18n.t('newEvent')}</div>
+    </div>` : ''
+
+  grid.innerHTML = evtsHTML + addHTML || `<div style="color:var(--muted);padding:20px">${I18n.t('noEvents')}</div>`
+}
+
+async function submitCreateEvent() {
+  const name = document.getElementById('ce-name').value.trim()
+  if (!name) return
+  const body = {
+    token:   Auth.getToken(),
+    name,
+    circuit: document.getElementById('ce-circuit').value.trim(),
+    series:  document.getElementById('ce-series').value.trim(),
+    notes:   document.getElementById('ce-notes').value.trim(),
+  }
+  const res = await fetch(`${API}/api/teams/${teamId}/events`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  if (res.ok) {
+    hideModal('modal-create-event')
+    clearModal(['ce-name','ce-circuit','ce-series','ce-notes'])
+    toast('Event created', 'success')
+    load()
+  } else {
+    toast('Error creating event', 'error')
+  }
+}
+
+function openEditEvent(id, name, circuit, series, notes) {
+  document.getElementById('ee-id').value      = id
+  document.getElementById('ee-name').value    = name
+  document.getElementById('ee-circuit').value = circuit
+  document.getElementById('ee-series').value  = series
+  document.getElementById('ee-notes').value   = notes
+  showModal('modal-edit-event')
+}
+
+async function saveEvent() {
+  const id   = document.getElementById('ee-id').value
+  const name = document.getElementById('ee-name').value.trim()
+  if (!name) return
+  const res = await fetch(`${API}/api/events/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      token:   Auth.getToken(),
+      name,
+      circuit: document.getElementById('ee-circuit').value.trim(),
+      series:  document.getElementById('ee-series').value.trim(),
+      notes:   document.getElementById('ee-notes').value.trim(),
+    })
+  })
+  if (res.ok) {
+    hideModal('modal-edit-event')
+    toast('Event updated', 'success')
+    load()
+  } else {
+    toast('Update failed', 'error')
+  }
+}
+
+function openDeleteEvent(id, name) {
+  document.getElementById('del-event-id').value = id
+  document.getElementById('del-event-name').textContent = name
+  showModal('modal-delete-event')
+}
+
+async function deleteEvent() {
+  const id = document.getElementById('del-event-id').value
+  const res = await fetch(`${API}/api/events/${id}?token=${Auth.getToken()}`, { method:'DELETE' })
+  if (res.ok) {
+    hideModal('modal-delete-event')
+    toast('Event deleted', 'success')
+    load()
+  } else {
+    toast('Delete failed', 'error')
+  }
+}
+
+// ── MEMBERS ──
+function renderMembers() {
+  const isManager = ['founder','manager'].includes(currentRole)
+  const tbody = document.getElementById('members-body')
+
+  if (!membersData.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:20px;text-align:center">${I18n.t('noMembers')}</td></tr>`
+    return
+  }
+
+  tbody.innerHTML = membersData.map(m => {
+    const isFounder    = m.role === 'founder'
+    const isMe         = m.id === null  // can't easily detect "me" here; handled by disabled logic
+    const canEdit      = isManager && !isFounder
+    const canBeChanged = currentRole === 'founder' || (currentRole === 'manager' && m.role !== 'manager' && !isFounder)
+
+    // Lineup chips — show which lineups this member has access to (by matching lineup_access)
+    const memberLineups = lineupsData.filter(l => l.id).slice(0, 3) // placeholder — real data below
+    const lineupChips = '' // populated if lineup_access data is available
+
+    const roleSelect = canBeChanged
+      ? `<select class="role-select" onchange="setRole('${esc(m.id)}', this.value, this)">
+          <option value="manager"  ${m.role==='manager'  ? 'selected':''}>${I18n.t('manager')}</option>
+          <option value="driver"   ${m.role==='driver'   ? 'selected':''}>${I18n.t('driver')}</option>
+          <option value="spectator"${m.role==='spectator'? 'selected':''}>${I18n.t('spectator')}</option>
+        </select>`
+      : `<span class="tag ${roleTagClass(m.role)}">${roleIcon(m.role)}${esc(I18n.t(m.role) || m.role)}</span>`
+
+    const removeBtn = canEdit
+      ? `<button class="icon-btn danger" title="Remove" onclick="openRemoveMember('${esc(m.id)}','${esc(m.steam_name)}')">✕</button>`
+      : ''
+
+    return `<tr>
+      <td>${m.steam_avatar
+        ? `<img class="driver-avatar-sm" src="${esc(m.steam_avatar)}" alt="">`
+        : `<div class="driver-avatar-sm"></div>`}</td>
+      <td class="driver-name-cell">${esc(m.steam_name)}</td>
+      <td>${roleSelect}</td>
+      <td><div class="lineup-chips">${lineupChips}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${new Date(m.joined_at*1000).toLocaleDateString()}</td>
+      <td><div class="member-actions">${removeBtn}</div></td>
+    </tr>`
+  }).join('')
+}
+
+function roleTagClass(role) {
+  return { founder:'tag-lime', manager:'tag-blue', driver:'tag-gray', spectator:'tag-gray' }[role] || 'tag-gray'
+}
+
+function roleIcon(role) {
+  const icons = { founder:'founder', manager:'manager', driver:'driver', spectator:'spectator' }
+  const name = icons[role]
+  return name ? `<img class="role-icon" src="assets/svg/${name}.svg" alt="${role}" title="${role}">` : ''
+}
+
+async function setRole(userId, newRole, selectEl) {
+  selectEl.disabled = true
+  const res = await fetch(`${API}/api/teams/${teamId}/members/${userId}/role`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ token: Auth.getToken(), role: newRole })
+  })
+  if (res.ok) {
+    toast('Role updated', 'success')
+    load()
+  } else {
+    toast('Could not update role', 'error')
+    selectEl.disabled = false
+    // Revert select to previous value
+    load()
+  }
+}
+
+function openRemoveMember(userId, name) {
+  document.getElementById('rm-user-id').value       = userId
+  document.getElementById('rm-user-name').textContent = name
+  showModal('modal-remove-member')
+}
+
+async function removeMember() {
+  const userId = document.getElementById('rm-user-id').value
+  const res = await fetch(`${API}/api/teams/${teamId}/members/${userId}`, {
+    method:'DELETE', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ token: Auth.getToken() })
+  })
+  if (res.ok) {
+    hideModal('modal-remove-member')
+    toast('Member removed', 'success')
+    load()
+  } else {
+    const err = await res.json().catch(() => ({}))
+    toast(err.detail || 'Could not remove member', 'error')
+  }
+}
+
+// ── SETTINGS ──
+async function saveTeamName() {
+  const name = document.getElementById('s-name').value.trim()
+  if (!name) return
+  // Note: update team name endpoint is not yet in pitwall_server.py
+  // This call will fail gracefully — placeholder for when it's added
+  toast('Team name update — coming soon', 'error')
+}
+
+function confirmLeaveTeam() {
+  const isFounder = currentRole === 'founder'
+  const titleEl   = document.getElementById('leave-modal-title')
+  const descEl    = document.getElementById('leave-modal-desc')
+  const wrapEl    = document.getElementById('leave-confirm-wrap')
+  const inputEl   = document.getElementById('leave-confirm-input')
+  const btnEl     = document.getElementById('leave-confirm-btn')
+
+  if (isFounder) {
+    titleEl.textContent = 'Delete Team'
+    descEl.innerHTML    = `You are the <strong style="color:var(--red)">founder</strong> of <strong style="color:var(--text)">${esc(teamData.name)}</strong>. This will <strong style="color:var(--red)">permanently delete</strong> the team, all its events and lineups. This cannot be undone.`
+    wrapEl.style.display  = ''
+    inputEl.value         = ''
+    btnEl.textContent     = 'Delete Team'
+    btnEl.disabled        = true
+  } else {
+    titleEl.textContent   = 'Leave Team'
+    descEl.innerHTML      = `Are you sure you want to leave <strong style="color:var(--text)">${esc(teamData.name)}</strong>? You will lose access to all its lineups.`
+    wrapEl.style.display  = 'none'
+    btnEl.textContent     = 'Leave Team'
+    btnEl.disabled        = false
+  }
+
+  showModal('modal-leave-team')
+}
+
+async function executeLeaveTeam() {
+  const isFounder = currentRole === 'founder'
+  if (isFounder && document.getElementById('leave-confirm-input').value !== 'DELETE') return
+
+  const me = await Auth.getUser()
+  if (!me) return
+
+  const res = await fetch(`${API}/api/teams/${teamId}/members/${me.user.id}`, {
+    method:'DELETE', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ token: Auth.getToken() })
+  })
+  if (res.ok) {
+    _navigate('main.html')
+  } else {
+    hideModal('modal-leave-team')
+    toast('Could not leave team', 'error')
+  }
+}
+
+// ── UTILS ──
+function copyCode() {
+  const code = (teamData.code||'').toUpperCase()
+  if (!code || code === '—') return
+  navigator.clipboard.writeText(code).then(() => {
+    const hintEl = document.getElementById('copy-hint')
+    if (hintEl) {
+      hintEl.textContent = '✓ Copied!'
+      setTimeout(() => hintEl.textContent = 'Click to copy', 1800)
+    } else {
+      toast('Team code copied to clipboard!', 'success')
+    }
+  })
+}
+
+function clearModal(ids) {
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = '' })
+}
+
+let _toastTimer
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = `show ${type}`
+  clearTimeout(_toastTimer)
+  _toastTimer = setTimeout(() => { el.className = '' }, 2800)
+}
+
+load()
+</script>
+</body>
+</html>

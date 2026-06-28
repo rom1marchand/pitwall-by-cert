@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pit Strategy</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  /* Big laps counter */
+  .pit-hero {
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-bottom:5px;
+  }
+  .laps-block {}
+  .laps-lbl { font-size:9px; font-weight:900; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); }
+  .laps-val {
+    font-size:48px; font-weight:900; line-height:0.9; letter-spacing:-2px;
+    color:var(--lime); font-variant-numeric:tabular-nums;
+    transition:color 0.3s;
+  }
+  .laps-val.urgent { color:var(--red); animation:urgent-pulse 0.6s ease-in-out infinite; }
+  .laps-val.soon   { color:var(--amber); }
+  .laps-val .laps-unit { font-size:16px; color:var(--muted); margin-left:3px; font-weight:700; letter-spacing:0; }
+  @keyframes urgent-pulse { 50% { opacity:0.6; } }
+
+  .rec-block { text-align:right; }
+  .rec-lbl { font-size:9px; font-weight:900; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); }
+  .rec-val { font-size:24px; font-weight:900; color:var(--lime); font-variant-numeric:tabular-nums; }
+
+  /* Pit window timeline */
+  .window-section { margin-bottom:6px; }
+  .window-lbl { font-size:9px; font-weight:900; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+  .window-track {
+    position:relative; height:18px;
+    background:rgba(255,255,255,0.04); border:1px solid var(--border2);
+    border-radius:3px; overflow:hidden;
+  }
+  .window-fill {
+    position:absolute; top:0; bottom:0;
+    background:rgba(200,255,0,0.2); border-radius:2px;
+    transition:left 0.3s, width 0.3s;
+  }
+  .window-now {
+    position:absolute; top:0; bottom:0; width:2px;
+    background:var(--lime); z-index:2;
+    box-shadow:0 0 6px var(--lime);
+    transition:left 0.3s;
+  }
+  .window-labels {
+    display:flex; justify-content:space-between;
+    font-size:8px; font-weight:700; color:var(--muted);
+    font-variant-numeric:tabular-nums; margin-top:2px;
+  }
+  .window-open-lbl  { color:var(--lime); }
+  .window-close-lbl { color:var(--amber); }
+
+  /* Data rows */
+  .data-row {
+    display:grid; grid-template-columns:1fr auto;
+    gap:2px 8px; font-size:12px; margin-bottom:4px;
+  }
+  .data-row .k { color:var(--muted); font-size:9px; font-weight:900; letter-spacing:0.1em; text-transform:uppercase; }
+  .data-row .v { font-weight:900; text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* Tyre recommendation */
+  .tyre-reco {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:5px 8px; border-radius:3px;
+    background:rgba(200,255,0,0.08); border:1px solid rgba(200,255,0,0.3);
+    margin-top:4px;
+  }
+  .tyre-reco.wet  { background:rgba(59,167,255,0.1); border-color:rgba(59,167,255,0.3); }
+  .tyre-reco.none { background:rgba(255,255,255,0.04); border-color:var(--border2); }
+  .reco-lbl { font-size:8px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .reco-val { font-size:13px; font-weight:900; }
+
+  /* Scheduled stops */
+  .stops-row {
+    display:flex; align-items:center; gap:4px; margin-top:4px;
+  }
+  .stops-lbl { font-size:9px; font-weight:900; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); flex:1; }
+  .stop-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--border2); border:1px solid var(--muted);
+    transition:background 0.2s, border-color 0.2s;
+  }
+  .stop-dot.done { background:var(--lime); border-color:var(--lime); }
+  .stop-dot.next { background:var(--amber); border-color:var(--amber); animation:stop-blink 1s infinite; }
+  @keyframes stop-blink { 50% { opacity:0.4; } }
+
+  /* Reason */
+  .reason { font-size:9px; color:var(--muted); font-style:italic; margin-top:3px; line-height:1.3; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Pit Strategy</div>
+    <div class="dot" id="dot"></div>
+  </div>
+
+  <!-- Hero: laps until pit + recommended lap -->
+  <div class="pit-hero">
+    <div class="laps-block">
+      <div class="laps-lbl">Laps Until Pit</div>
+      <div class="laps-val" id="laps-val">—<span class="laps-unit">L</span></div>
+    </div>
+    <div class="rec-block">
+      <div class="rec-lbl">Rec. Lap</div>
+      <div class="rec-val" id="rec-lap">—</div>
+    </div>
+  </div>
+
+  <!-- Pit window timeline -->
+  <div class="window-section">
+    <div class="window-lbl">Pit Window</div>
+    <div class="window-track">
+      <div class="window-fill" id="win-fill" style="left:0;width:0"></div>
+      <div class="window-now"  id="win-now"  style="left:0"></div>
+    </div>
+    <div class="window-labels">
+      <span class="window-open-lbl" id="win-open-lbl">L—</span>
+      <span id="win-cur-lbl" style="color:var(--muted2)">now</span>
+      <span class="window-close-lbl" id="win-close-lbl">L—</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="data-row">
+    <div class="k">Limiting Factor</div><div class="v" id="limit">—</div>
+    <div class="k">Window</div><div class="v" id="window">—</div>
+    <div class="k">Pit Stops Made</div><div class="v" id="stops-made">—</div>
+  </div>
+
+  <!-- Tyre recommendation -->
+  <div class="tyre-reco" id="reco-box">
+    <div class="reco-lbl">Recommended</div>
+    <div class="reco-val" id="reco-val">—</div>
+  </div>
+
+  <!-- Scheduled stops indicator -->
+  <div class="stops-row" id="stops-row">
+    <div class="stops-lbl">Scheduled Stops</div>
+    <!-- dots inserted dynamically -->
+  </div>
+
+  <div class="reason" id="reason"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: (s) => {
+      const se  = s.session  || {};
+      const str = s.strategy || {};
+      const rp  = str.race_plan || {};
+      const st  = str.stint  || {};
+      const ty  = str.tyres  || {};
+      const d   = s.driver   || {};
+
+      // Laps until pit
+      const laps = rp.laps_until_pit ?? st.laps_until_pit;
+      const lapEl = $('laps-val');
+      lapEl.innerHTML = (laps != null ? laps : '—') + '<span class="laps-unit"> L</span>';
+      lapEl.className = 'laps-val' + (laps != null && laps <= 2 ? ' urgent' : (laps != null && laps <= 5 ? ' soon' : ''));
+
+      // Recommended lap
+      const lapN = se.lap_number;
+      $('rec-lap').textContent = (laps != null && lapN != null) ? String(lapN + laps) : '—';
+
+      // Pit window
+      const wOpen  = rp.window_open;
+      const wClose = rp.window_close;
+      const totalLaps = se.total_laps || 50;
+      if (wOpen != null && wClose != null && lapN != null) {
+        const pctOpen  = clamp((wOpen  / totalLaps) * 100, 0, 100);
+        const pctClose = clamp((wClose / totalLaps) * 100, 0, 100);
+        const pctNow   = clamp((lapN   / totalLaps) * 100, 0, 100);
+        $('win-fill').style.left  = pctOpen + '%';
+        $('win-fill').style.width = (pctClose - pctOpen) + '%';
+        $('win-now').style.left   = pctNow + '%';
+        $('win-open-lbl').textContent  = 'L' + wOpen;
+        $('win-close-lbl').textContent = 'L' + wClose;
+        $('win-cur-lbl').textContent   = 'L' + lapN;
+        $('window').textContent = `L${wOpen}–${wClose}`;
+      } else {
+        $('window').textContent = '—';
+      }
+
+      // Stats
+      $('limit').textContent = rp.limiting_factor || '—';
+      $('stops-made').textContent = d.num_pitstops ?? d.pit_stops_made ?? se.pit_stops_made ?? '—';
+
+      // Tyre recommendation
+      const reco = (ty.recommended || ty.recommendation || 'NONE').toString().toUpperCase();
+      $('reco-val').textContent = reco;
+      const box = $('reco-box');
+      box.className = 'tyre-reco ' + (reco === 'NONE' ? 'none' : (reco.includes('WET') || reco.includes('INTER') ? 'wet' : ''));
+
+      // Scheduled stops dots
+      const scheduled = d.scheduled_stops ?? se.scheduled_stops ?? 0;
+      const made = parseInt($('stops-made').textContent) || 0;
+      const stopsRow = $('stops-row');
+      // Remove old dots
+      while (stopsRow.children.length > 1) stopsRow.removeChild(stopsRow.lastChild);
+      for (let i = 0; i < Math.max(scheduled, 5); i++) {
+        const dot = document.createElement('div');
+        dot.className = 'stop-dot' + (i < made ? ' done' : (i === made ? ' next' : ''));
+        stopsRow.appendChild(dot);
+      }
+
+      // Reason
+      $('reason').textContent = rp.reason || st.reason || '';
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tyre Management — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="stint-engine.js"></script>
+<style>
+.sp-subnav { display:flex; gap:2px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--border); }
+.sp-subnav a { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
+.sp-subnav a:hover { color:var(--text); }
+.sp-subnav a.active { color:var(--lime); border-bottom-color:var(--lime); }
+
+.tyres-page { max-width:1200px; margin:0 auto; padding:24px 20px; }
+
+/* ── SUMMARY BAR ── */
+.pool-summary { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+.pool-stat { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:12px 18px; text-align:center; min-width:120px; }
+.pool-stat-label { font-size:9px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.pool-stat-value { font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:900; }
+.pool-stat-value.lime { color:var(--lime); }
+.pool-stat-value.warn { color:#ff8c00; }
+.pool-stat-value.danger { color:#ff3b3b; }
+
+/* ── ALLOCATION BAR ── */
+.alloc-visual { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:16px; margin-bottom:24px; }
+.alloc-bar-track { height:24px; background:var(--surface); border-radius:12px; overflow:hidden; display:flex; margin-top:8px; }
+.alloc-seg { height:100%; transition:width .3s; }
+.alloc-seg.mounted { background:var(--lime); }
+.alloc-seg.used { background:#ff8c00; }
+.alloc-seg.dead { background:#ff3b3b; }
+.alloc-seg.fresh { background:var(--border); }
+.alloc-legend { display:flex; gap:16px; margin-top:8px; font-size:10px; color:var(--muted); }
+.alloc-legend-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+
+/* ── MOUNTED DISPLAY ── */
+.mounted-section { margin-bottom:28px; }
+.car-layout { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:12px; max-width:500px; margin:0 auto; }
+.corner-card { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:14px; position:relative; }
+.corner-label { font-size:9px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.corner-id { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:600; color:var(--muted); position:absolute; top:8px; right:10px; }
+.corner-compound { display:inline-flex; align-items:center; gap:6px; margin-bottom:6px; }
+.corner-health { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:900; }
+.corner-health-bar { height:6px; border-radius:3px; background:var(--surface); margin-top:4px; }
+.corner-health-fill { height:100%; border-radius:3px; transition:width .3s; }
+.corner-laps { font-size:10px; color:var(--muted); margin-top:4px; }
+.corner-actual { font-size:11px; color:#3b8fff; margin-top:2px; }
+
+/* ── INVENTORY TABLE ── */
+.inv-table { width:100%; border-collapse:collapse; }
+.inv-table th { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); }
+.inv-table td { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600; padding:8px 10px; border-bottom:1px solid rgba(34,34,34,.5); }
+.inv-table tr.mounted { background:rgba(200,255,0,.04); }
+.inv-table tr.dead td { opacity:.4; }
+.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.status-fresh { background:#555; }
+.status-mounted { background:var(--lime); }
+.status-used { background:#ff8c00; }
+.status-dead { background:#ff3b3b; }
+
+.section-title { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+
+.filter-bar { display:flex; gap:8px; margin-bottom:12px; }
+.filter-btn { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:5px 12px; border:1px solid var(--border); border-radius:2px; background:transparent; color:var(--muted); cursor:pointer; transition:all .15s; }
+.filter-btn:hover { color:var(--text); border-color:var(--text); }
+.filter-btn.active { color:var(--lime); border-color:var(--lime); background:rgba(200,255,0,.06); }
+
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; color:var(--muted); gap:12px; }
+.empty-state a { color:var(--lime); text-decoration:none; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="sp-subnav">
+  <a href="stint-setup.html">Setup</a>
+  <a href="stint-summary.html">Summary</a>
+  <a href="stint-plan.html">Plan</a>
+  <a href="stint-tyres.html" class="active">Tyres</a>
+</div>
+
+<div class="tyres-page">
+  <div id="content">
+    <div class="empty-state">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">No strategy calculated yet</div>
+      <div>Go to <a href="stint-setup.html">Setup</a> to configure and calculate</div>
+    </div>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+renderHeader(lineupId ? 'lineup' : 'local', 'stint-plan')
+if (_checkPopoutOverlay('stint-plan')) throw ''
+
+const activeScenario = sessionStorage.getItem('sp_scenario') || 'default'
+let currentFilter = 'all'
+let tyreData = null
+
+async function loadData() {
+  try {
+    // First calculate to ensure data exists
+    const params = JSON.parse(sessionStorage.getItem('sp_params') || '{}')
+    const drivers = JSON.parse(sessionStorage.getItem('sp_drivers') || '[]')
+    const weather = JSON.parse(sessionStorage.getItem('sp_weather') || '[]')
+    const tyreConfigs = JSON.parse(sessionStorage.getItem('sp_tyre_configs') || '[]')
+
+    if (!params.race_duration_s) return
+
+    const result = await StintPlanAPI.calculate(activeScenario, params, drivers, weather, tyreConfigs)
+    tyreData = result
+    render(result)
+  } catch (err) {
+    console.error('[StintTyres]', err)
+  }
+}
+
+function render(r) {
+  const pool = r.tyre_pool || {}
+  const inventory = r.tyre_inventory || []
+  const stints = r.stints || []
+
+  let html = ''
+
+  // ── POOL SUMMARY ──
+  const tyresRem = pool.tyres_remaining || 0
+  const tyresUsed = pool.tyres_used || 0
+  const totalAlloc = pool.allocation || 0
+  const remClass = tyresRem < 8 ? 'danger' : tyresRem < 16 ? 'warn' : 'lime'
+
+  html += `<div class="pool-summary">
+    <div class="pool-stat">
+      <div class="pool-stat-label">Remaining</div>
+      <div class="pool-stat-value ${remClass}">${tyresRem}</div>
+    </div>
+    <div class="pool-stat">
+      <div class="pool-stat-label">Used</div>
+      <div class="pool-stat-value">${tyresUsed}</div>
+    </div>
+    <div class="pool-stat">
+      <div class="pool-stat-label">Allocation</div>
+      <div class="pool-stat-value">${totalAlloc}</div>
+    </div>
+    <div class="pool-stat">
+      <div class="pool-stat-label">Mounted</div>
+      <div class="pool-stat-value lime">${pool.mounted || 0}</div>
+    </div>
+    <div class="pool-stat">
+      <div class="pool-stat-label">Reusable</div>
+      <div class="pool-stat-value" style="color:#ff8c00">${pool.used_available || 0}</div>
+    </div>
+    <div class="pool-stat">
+      <div class="pool-stat-label">Dead</div>
+      <div class="pool-stat-value danger">${pool.dead || 0}</div>
+    </div>
+  </div>`
+
+  // ── ALLOCATION BAR ──
+  const mountedPct = (pool.mounted || 0) / Math.max(1, totalAlloc) * 100
+  const usedPct = (pool.used_available || 0) / Math.max(1, totalAlloc) * 100
+  const deadPct = (pool.dead || 0) / Math.max(1, totalAlloc) * 100
+  const freshPct = Math.max(0, 100 - mountedPct - usedPct - deadPct)
+
+  html += `<div class="alloc-visual">
+    <div class="section-title">Allocation Usage</div>
+    <div class="alloc-bar-track">
+      <div class="alloc-seg mounted" style="width:${mountedPct}%"></div>
+      <div class="alloc-seg used" style="width:${usedPct}%"></div>
+      <div class="alloc-seg dead" style="width:${deadPct}%"></div>
+      <div class="alloc-seg fresh" style="width:${freshPct}%"></div>
+    </div>
+    <div class="alloc-legend">
+      <span><span class="alloc-legend-dot" style="background:var(--lime)"></span>Mounted (${pool.mounted || 0})</span>
+      <span><span class="alloc-legend-dot" style="background:#ff8c00"></span>Used (${pool.used_available || 0})</span>
+      <span><span class="alloc-legend-dot" style="background:#ff3b3b"></span>Dead (${pool.dead || 0})</span>
+      <span><span class="alloc-legend-dot" style="background:var(--border)"></span>Available (${tyresRem})</span>
+    </div>
+  </div>`
+
+  // ── CURRENTLY MOUNTED (CAR VIEW) ──
+  const mounted = inventory.filter(t => t.status === 'mounted')
+  if (mounted.length === 4) {
+    html += '<div class="mounted-section"><div class="section-title">Currently Mounted</div>'
+    html += '<div class="car-layout">'
+    for (const pos of ['fl', 'fr', 'rl', 'rr']) {
+      const t = mounted.find(m => m.corner === pos)
+      if (!t) continue
+      const cpd = CPDS[t.compound] || { s: '?', c: '#FFD700' }
+      const col = tyreHealthColor(t.health)
+      const actualHtml = t.actual_health !== null
+        ? `<div class="corner-actual">Live: ${t.actual_health}%</div>` : ''
+      html += `<div class="corner-card">
+        <div class="corner-label">${CORNER_LABELS[pos]}</div>
+        <div class="corner-id">#${t.id}</div>
+        <div class="corner-compound">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:900;color:#000;background:${cpd.c}">${cpd.s}</span>
+          ${cpd.label || t.compound}
+        </div>
+        <div class="corner-health" style="color:${col}">${Math.round(t.health)}%</div>
+        <div class="corner-health-bar"><div class="corner-health-fill" style="width:${t.health}%;background:${col}"></div></div>
+        <div class="corner-laps">${t.laps_done} laps | ${t.stint_ids.length} stint${t.stint_ids.length > 1 ? 's' : ''}</div>
+        ${actualHtml}
+      </div>`
+    }
+    html += '</div></div>'
+  }
+
+  // ── STINT TYRE USAGE TIMELINE ──
+  if (stints.length) {
+    html += '<div class="section-title">Tyre Usage Per Stint</div>'
+    html += '<table class="inv-table"><thead><tr>'
+    html += '<th>Stint</th><th>Driver</th><th>Laps</th><th>FL</th><th>FR</th><th>RL</th><th>RR</th><th>Changed</th>'
+    html += '</tr></thead><tbody>'
+    for (const st of stints) {
+      const ids = st.tyre_ids || {}
+      const te = st.tyres_end || {}
+      const ts = st.tyres_start || {}
+      const changes = st.tyre_changes || []
+      const changedLabel = changes.length === 0 ? '<span style="color:var(--lime)">No change</span>'
+        : changes.length === 4 ? 'Full set' : changes.map(c => CORNER_LABELS[c]).join(', ')
+      html += `<tr>
+        <td>#${st.id}</td>
+        <td style="color:${st.driver_color}">${esc(st.driver_name)}</td>
+        <td>${st.laps}</td>
+        ${CORNERS.map(c => {
+          const startH = Math.round(ts[c] || 0)
+          const endH = Math.round(te[c] || 0)
+          const col = tyreHealthColor(endH)
+          const isNew = changes.includes(c)
+          const idStr = ids[c] ? `#${ids[c]}` : ''
+          return `<td><span style="color:${col};font-weight:900">${endH}%</span> <span style="color:var(--muted);font-size:10px">${startH}→${endH} ${idStr}${isNew ? ' NEW' : ''}</span></td>`
+        }).join('')}
+        <td>${changedLabel}</td>
+      </tr>`
+    }
+    html += '</tbody></table>'
+  }
+
+  // ── FULL INVENTORY TABLE ──
+  html += '<div class="section-title" style="margin-top:28px">Full Tyre Inventory</div>'
+
+  // Filter buttons
+  html += `<div class="filter-bar">
+    <button class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">All (${inventory.length})</button>
+    <button class="filter-btn ${currentFilter === 'mounted' ? 'active' : ''}" onclick="setFilter('mounted')">Mounted (${inventory.filter(t=>t.status==='mounted').length})</button>
+    <button class="filter-btn ${currentFilter === 'used' ? 'active' : ''}" onclick="setFilter('used')">Used (${inventory.filter(t=>t.status==='used').length})</button>
+    <button class="filter-btn ${currentFilter === 'dead' ? 'active' : ''}" onclick="setFilter('dead')">Dead (${inventory.filter(t=>t.status==='dead').length})</button>
+  </div>`
+
+  const filtered = currentFilter === 'all' ? inventory : inventory.filter(t => t.status === currentFilter)
+
+  html += '<table class="inv-table"><thead><tr>'
+  html += '<th>ID</th><th>Compound</th><th>Status</th><th>Corner</th><th>Health</th><th>Actual</th><th>Laps</th><th>Stints</th>'
+  html += '</tr></thead><tbody>'
+  for (const t of filtered) {
+    const cpd = CPDS[t.compound] || { s: '?', c: '#FFD700' }
+    const col = tyreHealthColor(t.health)
+    const statusCls = `status-${t.status}`
+    const rowCls = t.status === 'mounted' ? ' class="mounted"' : t.status === 'dead' ? ' class="dead"' : ''
+    html += `<tr${rowCls}>
+      <td>#${t.id}</td>
+      <td><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:900;color:#000;background:${cpd.c}">${cpd.s}</span> ${t.compound}</td>
+      <td><span class="status-dot ${statusCls}"></span>${t.status}</td>
+      <td>${t.corner ? CORNER_LABELS[t.corner] : '\u2014'}</td>
+      <td style="color:${col};font-weight:900">${Math.round(t.health)}%</td>
+      <td>${t.actual_health !== null ? Math.round(t.actual_health) + '%' : '\u2014'}</td>
+      <td>${t.laps_done}</td>
+      <td style="font-size:11px;color:var(--muted)">${t.stint_ids.length ? t.stint_ids.map(s => '#' + s).join(', ') : '\u2014'}</td>
+    </tr>`
+  }
+  html += '</tbody></table>'
+
+  document.getElementById('content').innerHTML = html
+}
+
+function setFilter(f) {
+  currentFilter = f
+  if (tyreData) render(tyreData)
+}
+
+loadData()
+</script>
+</body>
+</html>

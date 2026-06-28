@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stint Calculator — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<style>
+/* ── CSS VARIABLE FALLBACKS (overridden by injectSharedCSS) ── */
+:root {
+  --lime: #C8FF00;
+  --surface: #121212;
+  --bg: #000000;
+  --border: #282828;
+  --muted: #b3b3b3;
+  --text: #ffffff;
+  --spotify-card: #181818;
+  --spotify-surface: #282828;
+}
+
+/* ── LAYOUT ── */
+.app-container {
+  height: 100%;
+  overflow-y: auto;
+  background: linear-gradient(180deg, var(--surface, #121212) 0%, var(--bg, #000) 300px);
+}
+.app-container::-webkit-scrollbar { width: 12px; }
+.app-container::-webkit-scrollbar-track { background: transparent; }
+.app-container::-webkit-scrollbar-thumb { background: #282828; border-radius: 6px; }
+.app-container::-webkit-scrollbar-thumb:hover { background: #3e3e3e; }
+
+.dash-wrap { max-width: 1440px; margin: 0 auto; padding: 24px 32px 80px; }
+
+/* ── HERO ── */
+.page-hero { padding: 32px 0 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+.page-hero-left {}
+.page-hero-label { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+.page-hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: 48px; font-weight: 900; line-height: 1; margin-bottom: 8px; }
+.page-hero-title span { color: var(--lime); }
+.page-hero-sub { font-size: 14px; color: var(--muted); }
+.back-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); padding: 9px 18px; border-radius: 20px;
+  font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: .05em;
+  margin-top: 8px;
+}
+.back-btn:hover { border-color: var(--lime); color: var(--lime); }
+
+/* ── MAIN GRID ── */
+.calc-layout {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 20px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+/* ── INPUT CARD ── */
+.input-card {
+  background: var(--spotify-card);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.input-card:last-child { margin-bottom: 0; }
+.input-card-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--lime);
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.input-card-title svg { opacity: .8; }
+
+/* ── FORM ── */
+.form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.form-group { margin-bottom: 14px; }
+.form-group:last-child { margin-bottom: 0; }
+.form-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; }
+.form-input {
+  width: 100%; padding: 10px 12px;
+  background: var(--spotify-surface, #282828);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px;
+  transition: border-color .2s; box-sizing: border-box;
+}
+.form-input:focus { outline: none; border-color: var(--lime); }
+.form-input.center { text-align: center; }
+.input-unit { font-size: 10px; color: var(--muted); text-align: center; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── CLASS SELECTOR ── */
+.class-selector { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.class-btn {
+  padding: 9px 4px; text-align: center;
+  background: var(--spotify-surface); border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; transition: all .2s;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .03em; color: var(--muted);
+}
+.class-btn:hover  { border-color: var(--lime); color: var(--lime); }
+.class-btn.active { background: rgba(200,255,0,.1); border-color: var(--lime); color: var(--lime); }
+
+/* ── COMPOUND CARDS ── */
+.compound-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+.compound-card {
+  border-radius: 8px; border: 2px solid var(--border);
+  padding: 10px 8px; cursor: pointer; transition: all .2s;
+  opacity: .45; user-select: none;
+}
+.compound-card.active { opacity: 1; }
+.compound-card-hdr { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.compound-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.compound-name { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.compound-life-input {
+  width: 100%; padding: 5px 6px; text-align: center;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text);
+  font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700;
+  box-sizing: border-box; transition: border-color .2s;
+}
+.compound-life-input:focus { outline: none; border-color: inherit; }
+.compound-life-label { font-size: 9px; color: var(--muted); text-align: center; margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── TOGGLE ── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 0; margin-top: 8px; border-top: 1px solid var(--border); }
+.toggle-text {}
+.toggle-label { font-size: 13px; color: var(--text); font-weight: 500; }
+.toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.toggle {
+  position: relative; width: 40px; height: 22px; flex-shrink: 0;
+  background: var(--border); border-radius: 11px; cursor: pointer; transition: background .2s;
+}
+.toggle.on { background: var(--lime); }
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; background: #888; border-radius: 50%; transition: all .2s;
+}
+.toggle.on::after { transform: translateX(18px); background: #000; }
+
+/* ── METRICS ROW ── */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.metric-chip { background: var(--spotify-card); border-radius: 10px; padding: 14px 16px; border-left: 3px solid var(--border); }
+.metric-chip.hl  { border-left-color: var(--lime); }
+.metric-chip.warn { border-left-color: #FF9900; }
+.metric-chip.ok  { border-left-color: #1DB954; }
+.metric-val { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 900; line-height: 1; }
+.metric-val .unit { font-size: 13px; color: var(--muted); font-weight: 600; }
+.metric-lbl { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+
+/* ── STRATEGY TABS ── */
+.strategy-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.strat-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
+  font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s; color: var(--muted); background: transparent;
+}
+.strat-tab:hover { border-color: var(--lime); color: var(--lime); }
+.strat-tab.active { background: var(--lime); color: #000; border-color: var(--lime); }
+.strat-stops {
+  padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  background: rgba(0,0,0,.25);
+}
+.strat-tab.active .strat-stops { background: rgba(0,0,0,.2); }
+
+/* ── STRATEGY CARD ── */
+.strategy-card { background: var(--spotify-card); border-radius: 12px; padding: 20px; margin-bottom: 14px; }
+.strategy-card-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.strategy-name { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.strategy-name .arrow { color: var(--muted); font-weight: 400; margin: 0 4px; }
+.rec-badge {
+  background: rgba(200,255,0,.12); color: var(--lime);
+  border: 1px solid rgba(200,255,0,.25); border-radius: 20px;
+  padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+}
+
+/* ── TIMELINE ── */
+.timeline-wrap { margin-bottom: 20px; }
+.timeline-bar {
+  display: flex; height: 38px; border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border); margin-bottom: 8px;
+}
+.tl-seg {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 800;
+  color: #000; overflow: hidden; transition: filter .15s; cursor: default; letter-spacing: .04em;
+  text-shadow: 0 1px 3px rgba(255,255,255,.25);
+}
+.tl-seg:hover { filter: brightness(1.1); }
+.tl-pit {
+  width: 4px; background: rgba(255,255,255,.9); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.tl-pit::after {
+  content: ''; position: absolute; width: 4px; height: 4px;
+  background: #fff; border-radius: 50%; top: 50%; transform: translateY(-50%);
+}
+.tl-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.tl-pit-laps { display: flex; justify-content: center; gap: 0; margin-top: 2px; }
+
+/* ── STINT TABLE ── */
+.stint-table { width: 100%; border-collapse: collapse; }
+.stint-table th {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); padding: 6px 12px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.stint-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+.stint-table tbody tr:last-child td { border-bottom: none; }
+.stint-table tbody tr:hover td { background: rgba(255,255,255,.025); }
+.stint-num { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 900; color: var(--muted); }
+.laps-col { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; }
+.lap-range { font-size: 11px; color: var(--muted); font-weight: 600; }
+.compound-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 12px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+}
+.fuel-cell {}
+.fuel-bar-mini { height: 5px; background: var(--border); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.fuel-bar-mini-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #00BFFF, var(--lime)); transition: width .4s; }
+.fuel-val { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; }
+.fuel-warn { color: #FF9900; }
+.pit-cell { font-size: 11px; color: var(--muted); }
+.pit-tag { display: inline-block; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.pit-tag.finish { background: rgba(200,255,0,.12); color: var(--lime); }
+.pit-lap-num { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; }
+
+/* ── EMPTY STATE ── */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--muted); text-align: center; background: var(--spotify-card); border-radius: 12px; }
+.empty-icon { font-size: 44px; margin-bottom: 16px; opacity: .5; }
+.empty-title { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+.empty-sub { font-size: 13px; }
+
+/* ── FUEL ALERT ── */
+.fuel-alert {
+  background: rgba(255,153,0,.08); border: 1px solid rgba(255,153,0,.3);
+  border-radius: 8px; padding: 10px 14px; margin-top: 12px;
+  font-size: 12px; color: #FF9900; display: none;
+}
+.fuel-alert.show { display: block; }
+
+/* ── BTN (shared fallback) ── */
+.btn { padding: 12px 24px; border-radius: 24px; font-family: 'Barlow', sans-serif; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; transition: all .2s; border: none; }
+.btn-primary { background: var(--lime); color: #000; }
+.btn-primary:hover { background: #b8ef00; transform: scale(1.04); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--text); }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+
+<div id="app-header"></div>
+
+<div class="app-container">
+  <div class="dash-wrap">
+
+    <!-- Hero -->
+    <div class="page-hero">
+      <div class="page-hero-left">
+        <div class="page-hero-label">Strategy Tools</div>
+        <div class="page-hero-title"><span>Stint</span> Calculator</div>
+        <div class="page-hero-sub">Fuel &amp; strategy planning for LMU daily races and endurance</div>
+      </div>
+      <button class="back-btn" onclick="try{_navigate('main.html')}catch(e){history.back()}">← Dashboard</button>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="calc-layout">
+
+      <!-- ═══════════════════════ LEFT: INPUTS ═══════════════════════ -->
+      <div class="inputs-col">
+
+        <!-- Race Parameters -->
+        <div class="input-card">
+          <div class="input-card-title">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 12h18M3 6l9-3 9 3M3 18l9 3 9-3"/></svg>
+            Race Parameters
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Car Class</div>
+            <div class="class-selector">
+              <div class="class-btn active" onclick="setClass('hypercar',this)">Hyper</div>
+              <div class="class-btn" onclick="setClass('lmp2',this)">LMP2</div>
+              <div class="class-btn" onclick="setClass('lmp3',this)">LMP3</div>
+              <div class="class-btn" onclick="setClass('lmgt3',this)">LMGT3</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Race Duration</div>
+            <div class="form-row">
+              <div>
+                <input class="form-input center" id="race-hrs"  type="number" min="0" max="24" value="0">
+                <div class="input-unit">Hours</div>
+              </div>
+              <div>
+                <input class="form-input center" id="race-mins" type="number" min="0" max="59" value="45">
+                <div class="input-unit">Minutes</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Lap Time</div>
+            <div class="form-row-3">
+              <div>
+                <input class="form-input center" id="lap-min"  type="number" min="0" max="9"   value="1">
+                <div class="input-unit">Min</div>
+              </div>
+              <div>
+                <input class="form-input center" id="lap-sec"  type="number" min="0" max="59"  value="55">
+                <div class="input-unit">Sec</div>
+              </div>
+              <div>
+                <input class="form-input center" id="lap-ms"   type="number" min="0" max="999" value="0">
+                <div class="input-unit">Ms</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Pitstop Duration (sec)</div>
+            <input class="form-input" id="pit-duration" type="number" min="15" max="180" value="45">
+          </div>
+        </div>
+
+        <!-- Fuel Parameters -->
+        <div class="input-card">
+          <div class="input-card-title">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 22V10l9-8 9 8v12H3z"/><path d="M9 22v-8h6v8"/></svg>
+            Fuel Parameters
+          </div>
+          <div class="form-row" style="margin-bottom:14px">
+            <div>
+              <div class="form-label">Tank Size (L)</div>
+              <input class="form-input center" id="tank-size"    type="number" min="1"   max="200"  step="1"   value="75">
+            </div>
+            <div>
+              <div class="form-label">Usage / Lap (L)</div>
+              <input class="form-input center" id="fuel-per-lap" type="number" min="0.1" max="20"   step="0.1" value="3.8">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Safety Reserve (laps)</div>
+            <input class="form-input" id="fuel-reserve" type="number" min="0" max="10" value="2">
+          </div>
+        </div>
+
+        <!-- Tyre Strategy -->
+        <div class="input-card">
+          <div class="input-card-title">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+            Tyre Strategy
+          </div>
+
+          <div class="form-label" style="margin-bottom:10px">Compounds — click to enable / disable</div>
+          <div class="compound-grid">
+            <div class="compound-card active" id="ccard-soft"   onclick="toggleCompound('soft')"   style="border-color:#FF4444">
+              <div class="compound-card-hdr">
+                <div class="compound-dot" style="background:#FF4444"></div>
+                <div class="compound-name" style="color:#FF4444">Soft</div>
+              </div>
+              <input class="compound-life-input" id="life-soft"   type="number" min="1" max="200" value="30"
+                     onclick="event.stopPropagation()" style="border-color:#FF444455">
+              <div class="compound-life-label">Max laps</div>
+            </div>
+            <div class="compound-card active" id="ccard-medium" onclick="toggleCompound('medium')" style="border-color:#FFCC00">
+              <div class="compound-card-hdr">
+                <div class="compound-dot" style="background:#FFCC00"></div>
+                <div class="compound-name" style="color:#FFCC00">Medium</div>
+              </div>
+              <input class="compound-life-input" id="life-medium" type="number" min="1" max="200" value="42"
+                     onclick="event.stopPropagation()" style="border-color:#FFCC0055">
+              <div class="compound-life-label">Max laps</div>
+            </div>
+            <div class="compound-card active" id="ccard-hard"   onclick="toggleCompound('hard')"   style="border-color:#C0C0C0">
+              <div class="compound-card-hdr">
+                <div class="compound-dot" style="background:#C0C0C0"></div>
+                <div class="compound-name" style="color:#C0C0C0">Hard</div>
+              </div>
+              <input class="compound-life-input" id="life-hard"   type="number" min="1" max="200" value="55"
+                     onclick="event.stopPropagation()" style="border-color:#C0C0C055">
+              <div class="compound-life-label">Max laps</div>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <div class="toggle-label">Mandatory 2-Compound Rule</div>
+              <div class="toggle-sub">Must use 2 different tyre compounds</div>
+            </div>
+            <div class="toggle" id="toggle-2comp" onclick="toggle2Compound(this)"></div>
+          </div>
+        </div>
+
+      </div><!-- /inputs-col -->
+
+      <!-- ═══════════════════════ RIGHT: RESULTS ═══════════════════════ -->
+      <div id="result-panel">
+        <div class="empty-state">
+          <div class="empty-icon">⏱</div>
+          <div class="empty-title">Enter Race Details</div>
+          <div class="empty-sub">Fill in the parameters on the left to generate your strategy</div>
+        </div>
+      </div>
+
+    </div><!-- /calc-layout -->
+
+  </div>
+</div>
+
+<script>
+try { injectSharedCSS() } catch(e) {}
+try { renderHeader('stint-calculator', 'stint-calculator') } catch(e) {}
+
+/* ══════════════════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════════════════ */
+
+const COMPOUNDS = {
+  soft:   { id: 'soft',   label: 'Soft',   color: '#FF4444', textColor: '#000', bgAlpha: 'rgba(255,68,68,.18)'   },
+  medium: { id: 'medium', label: 'Medium', color: '#FFCC00', textColor: '#000', bgAlpha: 'rgba(255,204,0,.18)'   },
+  hard:   { id: 'hard',   label: 'Hard',   color: '#C8C8C8', textColor: '#000', bgAlpha: 'rgba(200,200,200,.15)' },
+}
+
+const CLASS_DEFAULTS = {
+  hypercar: { fuelPerLap: 3.8, tankSize: 75,  soft: 30, medium: 42, hard: 58 },
+  lmp2:     { fuelPerLap: 3.0, tankSize: 65,  soft: 24, medium: 35, hard: 48 },
+  lmp3:     { fuelPerLap: 2.3, tankSize: 55,  soft: 20, medium: 30, hard: 42 },
+  lmgt3:    { fuelPerLap: 2.7, tankSize: 60,  soft: 35, medium: 48, hard: 65 },
+}
+
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+
+let activeCompounds = { soft: true, medium: true, hard: true }
+let mandatory2      = false
+let activeStratIdx  = 0
+let lastStrategies  = []
+
+/* ══════════════════════════════════════════════════
+   HELPERS: READ INPUTS
+══════════════════════════════════════════════════ */
+
+function num(id, fallback = 0) {
+  const v = parseFloat(document.getElementById(id).value)
+  return isNaN(v) ? fallback : v
+}
+
+function getInputs() {
+  return {
+    raceSec:    (num('race-hrs') * 60 + num('race-mins')) * 60,
+    laptimeSec: num('lap-min') * 60 + num('lap-sec') + num('lap-ms') / 1000,
+    fuelPerLap: num('fuel-per-lap', 3.8),
+    tankSize:   num('tank-size', 75),
+    reserve:    num('fuel-reserve', 2),
+    pitSec:     num('pit-duration', 45),
+    lifeS:      num('life-soft', 30),
+    lifeM:      num('life-medium', 42),
+    lifeH:      num('life-hard', 55),
+  }
+}
+
+function getEnabledCompounds(inp) {
+  const all = [
+    { ...COMPOUNDS.soft,   life: inp.lifeS },
+    { ...COMPOUNDS.medium, life: inp.lifeM },
+    { ...COMPOUNDS.hard,   life: inp.lifeH },
+  ]
+  return all.filter(c => activeCompounds[c.id])
+}
+
+/* ══════════════════════════════════════════════════
+   STRATEGY LOGIC
+══════════════════════════════════════════════════ */
+
+function buildStintsFrom(totalLaps, sequence) {
+  // sequence: array of compounds (with life) in order — repeats when exhausted
+  const stints = []
+  let rem = totalLaps, lap = 1, si = 0
+  while (rem > 0 && si < sequence.length) {
+    const c = sequence[si]
+    const sl = Math.min(c.life, rem)
+    stints.push({ compound: c, laps: sl, startLap: lap, endLap: lap + sl - 1 })
+    lap += sl; rem -= sl; si++
+    if (si >= sequence.length && rem > 0) {
+      // Extend last compound if needed
+      while (rem > 0) {
+        const ext = Math.min(sequence[sequence.length - 1].life, rem)
+        stints.push({ compound: sequence[sequence.length - 1], laps: ext, startLap: lap, endLap: lap + ext - 1 })
+        lap += ext; rem -= ext
+      }
+    }
+  }
+  return stints
+}
+
+function stintKey(stints) {
+  return stints.map(s => `${s.compound.id}:${s.laps}`).join('|')
+}
+
+function generateStrategies(totalLaps, inp) {
+  const enabled = getEnabledCompounds(inp)
+  if (!enabled.length || totalLaps <= 0) return []
+
+  const candidates = []
+
+  // ── Single compound ──
+  for (const c of enabled) {
+    const seq = []
+    let rem = totalLaps
+    while (rem > 0) { seq.push(c); rem -= c.life }
+    candidates.push(buildStintsFrom(totalLaps, seq))
+  }
+
+  // ── Two-compound strategies ──
+  if (enabled.length >= 2) {
+    for (let i = 0; i < enabled.length; i++) {
+      for (let j = 0; j < enabled.length; j++) {
+        if (i === j) continue
+        const c1 = enabled[i], c2 = enabled[j]
+        // Try 1 to 4 stints on c1, then c2 for the rest
+        const maxSplits = Math.max(1, Math.min(4, Math.ceil(totalLaps / c1.life)))
+        for (let n = 1; n <= maxSplits; n++) {
+          const seq = []
+          for (let k = 0; k < n; k++) seq.push(c1)
+          let rem = totalLaps - n * c1.life
+          while (rem > 0) { seq.push(c2); rem -= c2.life }
+          if (seq.length > 0) candidates.push(buildStintsFrom(totalLaps, seq))
+        }
+      }
+    }
+  }
+
+  // ── Filter by mandatory rule ──
+  let valid = candidates
+  if (mandatory2) {
+    const filtered = candidates.filter(s => new Set(s.map(x => x.compound.id)).size >= 2)
+    if (filtered.length) valid = filtered
+  }
+
+  // ── Sort: fewer stops first ──
+  valid.sort((a, b) => (a.length - 1) - (b.length - 1))
+
+  // ── Deduplicate ──
+  const seen = new Set()
+  const deduped = []
+  for (const s of valid) {
+    const k = stintKey(s)
+    if (!seen.has(k)) { seen.add(k); deduped.push(s) }
+  }
+
+  return deduped.slice(0, 5)
+}
+
+function calcFuelPerStint(stints, inp) {
+  return stints.map((stint, i) => {
+    const isLast  = i === stints.length - 1
+    const reserve = isLast ? inp.reserve : 0
+    const needed  = (stint.laps + reserve) * inp.fuelPerLap
+    return Math.min(needed, inp.tankSize)
+  })
+}
+
+/* ══════════════════════════════════════════════════
+   RENDER
+══════════════════════════════════════════════════ */
+
+function renderResults(strategies, inp) {
+  const panel = document.getElementById('result-panel')
+
+  if (!strategies.length) {
+    panel.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">No Valid Strategy</div>
+      <div class="empty-sub">Enable at least one compound and check your inputs</div>
+    </div>`
+    return
+  }
+
+  const best    = strategies[0]
+  const stints  = strategies[activeStratIdx] || best
+  const stops   = stints.length - 1
+  const totalLaps = stints[stints.length - 1].endLap
+  const totalPitSec = stops * inp.pitSec
+  const fuelLoads = calcFuelPerStint(stints, inp)
+  const totalFuel = fuelLoads.reduce((a, b) => a + b, 0)
+  const laptimeMin = inp.laptimeSec / 60
+  const raceMins   = inp.raceSec / 60
+
+  // ── Fuel warning ──
+  const fuelOver = fuelLoads.some(f => f >= inp.tankSize - 0.1)
+
+  // ── Metrics ──
+  const metricHTML = `
+    <div class="metrics-row">
+      <div class="metric-chip hl">
+        <div class="metric-val">${totalLaps} <span class="unit">laps</span></div>
+        <div class="metric-lbl">Total Laps</div>
+      </div>
+      <div class="metric-chip ${stops === 0 ? 'ok' : stops > 2 ? 'warn' : 'hl'}">
+        <div class="metric-val">${stops} <span class="unit">stop${stops !== 1 ? 's' : ''}</span></div>
+        <div class="metric-lbl">Pit Stops</div>
+      </div>
+      <div class="metric-chip ${fuelOver ? 'warn' : ''}">
+        <div class="metric-val">${totalFuel.toFixed(1)} <span class="unit">L</span></div>
+        <div class="metric-lbl">Total Fuel</div>
+      </div>
+      <div class="metric-chip">
+        <div class="metric-val">${formatTime(totalPitSec)} <span class="unit">lost</span></div>
+        <div class="metric-lbl">Time in Pits</div>
+      </div>
+    </div>`
+
+  // ── Strategy tabs ──
+  const tabsHTML = `<div class="strategy-tabs">${
+    strategies.map((s, i) => {
+      const n = s.length - 1
+      const label = i === 0 ? 'Recommended' : `Alt ${i}`
+      const compounds = [...new Set(s.map(x => x.compound.label))].join(' / ')
+      return `<div class="strat-tab ${i === activeStratIdx ? 'active' : ''}" onclick="selectStrat(${i})">${label} — ${compounds} <span class="strat-stops">${n} stop${n !== 1 ? 's' : ''}</span></div>`
+    }).join('')
+  }</div>`
+
+  // ── Timeline ──
+  const seg = stints.map((s, i) => {
+    const pct = (s.laps / totalLaps * 100).toFixed(2)
+    const pitLine = i < stints.length - 1 ? `<div class="tl-pit"></div>` : ''
+    const label = pct > 6 ? s.compound.label.slice(0,1) : ''
+    return `<div class="tl-seg" style="width:${pct}%;background:${s.compound.color}" title="${s.compound.label}: Laps ${s.startLap}–${s.endLap}">${label}</div>${pitLine}`
+  }).join('')
+
+  const pitLapLabels = stints.slice(0, -1).map(s => `Pit L.${s.endLap}`).join(' &nbsp;|&nbsp; ')
+  const tlLabels = `
+    <div class="tl-labels">
+      <span>Lap 1</span>
+      <span style="color:var(--lime);font-size:10px">${pitLapLabels}</span>
+      <span>Lap ${totalLaps}</span>
+    </div>`
+
+  const timelineHTML = `
+    <div class="timeline-wrap">
+      <div class="timeline-bar">${seg}</div>
+      ${tlLabels}
+    </div>`
+
+  // ── Stint table ──
+  const tableRows = stints.map((s, i) => {
+    const fuel  = fuelLoads[i]
+    const isLast = i === stints.length - 1
+    const pitLap = !isLast ? s.endLap : null
+    const tankPct = Math.min(100, (fuel / inp.tankSize) * 100)
+    const fuelWarn = fuel >= inp.tankSize - 0.1
+
+    const pitCell = isLast
+      ? `<span class="pit-tag finish">🏁 Finish</span>`
+      : `<span class="pit-tag">Pit</span><br><span class="pit-lap-num">Lap ${pitLap}</span>`
+
+    const cmp = s.compound
+    return `<tr>
+      <td><span class="stint-num">${i + 1}</span></td>
+      <td>
+        <div class="laps-col">${s.laps} laps</div>
+        <div class="lap-range">L${s.startLap} → L${s.endLap}</div>
+      </td>
+      <td>
+        <span class="compound-pill" style="background:${cmp.bgAlpha};color:${cmp.color};border:1px solid ${cmp.color}44">
+          <span style="width:7px;height:7px;border-radius:50%;background:${cmp.color};display:inline-block"></span>
+          ${cmp.label}
+        </span>
+      </td>
+      <td class="fuel-cell">
+        <div class="fuel-val ${fuelWarn ? 'fuel-warn' : ''}">${fuel.toFixed(1)} L</div>
+        <div class="fuel-bar-mini">
+          <div class="fuel-bar-mini-fill" style="width:${tankPct.toFixed(1)}%"></div>
+        </div>
+      </td>
+      <td class="pit-cell">${pitCell}</td>
+    </tr>`
+  }).join('')
+
+  const tableHTML = `
+    <table class="stint-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Laps</th>
+          <th>Compound</th>
+          <th>Fuel to Load</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>`
+
+  // ── Strategy name ──
+  const compSeq = [...new Set(stints.map(s => s.compound.label))]
+  const stratNameHTML = compSeq.map((c, i) => {
+    const cc = Object.values(COMPOUNDS).find(x => x.label === c)
+    const arrow = i < compSeq.length - 1 ? `<span class="arrow">→</span>` : ''
+    return `<span style="color:${cc.color}">${c}</span>${arrow}`
+  }).join('')
+
+  const fuelAlertHTML = `<div class="fuel-alert ${fuelOver ? 'show' : ''}">⚠️ One or more stints exceed your tank size — consider a splash-and-dash or additional pitstop.</div>`
+
+  const stratCardHTML = `
+    <div class="strategy-card">
+      <div class="strategy-card-hdr">
+        <div class="strategy-name">${stratNameHTML}</div>
+        ${activeStratIdx === 0 ? '<span class="rec-badge">Optimal</span>' : ''}
+      </div>
+      ${timelineHTML}
+      ${tableHTML}
+      ${fuelAlertHTML}
+    </div>`
+
+  panel.innerHTML = metricHTML + tabsHTML + stratCardHTML
+}
+
+/* ══════════════════════════════════════════════════
+   MAIN CALCULATE
+══════════════════════════════════════════════════ */
+
+function calculate() {
+  const inp = getInputs()
+  if (inp.laptimeSec <= 0 || inp.raceSec <= 0) {
+    document.getElementById('result-panel').innerHTML = `<div class="empty-state">
+      <div class="empty-icon">⏱</div>
+      <div class="empty-title">Enter Race Details</div>
+      <div class="empty-sub">Set a valid race duration and lap time</div>
+    </div>`
+    return
+  }
+  const totalLaps = Math.ceil(inp.raceSec / inp.laptimeSec)
+  lastStrategies  = generateStrategies(totalLaps, inp)
+  if (activeStratIdx >= lastStrategies.length) activeStratIdx = 0
+  renderResults(lastStrategies, inp)
+}
+
+let debounceTimer = null
+function debounce() {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(calculate, 250)
+}
+
+/* ══════════════════════════════════════════════════
+   INTERACTIONS
+══════════════════════════════════════════════════ */
+
+function setClass(cls, el) {
+  document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('active'))
+  el.classList.add('active')
+  const d = CLASS_DEFAULTS[cls]
+  if (!d) return
+  document.getElementById('fuel-per-lap').value = d.fuelPerLap
+  document.getElementById('tank-size').value    = d.tankSize
+  document.getElementById('life-soft').value    = d.soft
+  document.getElementById('life-medium').value  = d.medium
+  document.getElementById('life-hard').value    = d.hard
+  debounce()
+}
+
+function toggleCompound(id) {
+  activeCompounds[id] = !activeCompounds[id]
+  const card = document.getElementById(`ccard-${id}`)
+  if (activeCompounds[id]) card.classList.add('active')
+  else card.classList.remove('active')
+  debounce()
+}
+
+function toggle2Compound(el) {
+  mandatory2 = !mandatory2
+  el.classList.toggle('on', mandatory2)
+  debounce()
+}
+
+function selectStrat(idx) {
+  activeStratIdx = idx
+  const inp = getInputs()
+  renderResults(lastStrategies, inp)
+}
+
+function formatTime(sec) {
+  if (sec < 60) return `${sec.toFixed(0)}s`
+  const m = Math.floor(sec / 60)
+  const s = Math.round(sec % 60).toString().padStart(2,'0')
+  return `${m}:${s}`
+}
+
+/* ══════════════════════════════════════════════════
+   INIT: Attach listeners
+══════════════════════════════════════════════════ */
+
+;['race-hrs','race-mins','lap-min','lap-sec','lap-ms',
+  'fuel-per-lap','tank-size','fuel-reserve','pit-duration',
+  'life-soft','life-medium','life-hard'
+].forEach(id => {
+  const el = document.getElementById(id)
+  if (el) el.addEventListener('input', debounce)
+})
+
+// Initial calculation
+calculate()
+</script>
+</body>
+</html>

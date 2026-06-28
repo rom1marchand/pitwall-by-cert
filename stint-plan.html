@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stint Plan — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="stint-engine.js"></script>
+<style>
+.sp-subnav { display:flex; gap:2px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--border); }
+.sp-subnav a { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
+.sp-subnav a:hover { color:var(--text); }
+.sp-subnav a.active { color:var(--lime); border-bottom-color:var(--lime); }
+
+.plan-page { max-width:1000px; margin:0 auto; padding:24px 20px; }
+
+/* ── MINI TOTALS ── */
+.mini-totals { display:flex; gap:20px; padding:12px 16px; margin-bottom:20px; background:var(--card); border:1px solid var(--border); border-radius:4px; font-family:'Barlow Condensed',sans-serif; flex-wrap:wrap; }
+.mt-item { display:flex; align-items:baseline; gap:6px; }
+.mt-label { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.mt-value { font-size:16px; font-weight:900; }
+.mt-value.lime { color:var(--lime); }
+
+/* ── TIMELINE ── */
+.timeline-container { margin-bottom:24px; }
+.timeline-bar { display:flex; height:40px; border-radius:4px; overflow:hidden; border:1px solid var(--border); background:var(--surface); }
+.tl-stint { display:flex; align-items:center; justify-content:center; gap:4px; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; color:#000; cursor:pointer; transition:opacity .15s; position:relative; border-right:1px solid rgba(0,0,0,.3); }
+.tl-stint:last-child { border-right:none; }
+.tl-stint:hover { opacity:.85; }
+.timeline-axis { display:flex; justify-content:space-between; margin-top:4px; font-size:9px; color:var(--muted); font-family:'Barlow Condensed',sans-serif; }
+
+/* ── STINT LIST ── */
+.stint-list { display:flex; flex-direction:column; gap:0; }
+
+.stint-card { display:grid; grid-template-columns:50px 1fr; border-left:3px solid var(--border); position:relative; }
+.stint-num { display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:900; color:var(--muted); }
+.stint-body { padding:14px 16px; border:1px solid var(--border); border-left:none; margin-bottom:-1px; cursor:pointer; transition:background .1s; }
+.stint-body:hover { background:rgba(255,255,255,.02); }
+.stint-body.editing { background:rgba(200,255,0,.03); border-color:rgba(200,255,0,.15); }
+
+.stint-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.stint-driver { display:flex; align-items:center; gap:6px; font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; }
+.stint-driver-dot { width:10px; height:10px; border-radius:50%; }
+.stint-clock { font-size:12px; color:var(--muted); font-family:'Barlow Condensed',sans-serif; font-weight:600; }
+
+.stint-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+.ss-label { font-size:8px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.ss-value { font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; }
+
+/* ── TYRE HEALTH 2x2 GRID ── */
+.tyre-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin-top:8px; max-width:220px; }
+.tyre-cell { display:flex; align-items:center; gap:6px; font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700; color:var(--muted); }
+.tyre-cell img { width:22px; height:22px; object-fit:contain; }
+.tyre-health-bar { flex:1; height:4px; border-radius:2px; background:var(--border); min-width:40px; }
+.tyre-health-fill { height:100%; border-radius:2px; }
+.tyre-pct { min-width:28px; text-align:right; }
+
+/* ── CONSUMPTION TARGET ── */
+.consumption-target { font-size:9px; color:var(--muted); margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-style:italic; }
+
+/* ── PIT SEPARATOR ── */
+.pit-sep { display:flex; align-items:center; gap:10px; padding:8px 16px 8px 53px; font-family:'Barlow Condensed',sans-serif; font-size:11px; color:var(--muted); }
+.pit-dot { width:10px; height:10px; border-radius:50%; background:var(--border); flex-shrink:0; }
+.pit-tag { font-weight:700; letter-spacing:.05em; }
+.pit-detail { display:flex; gap:10px; }
+.pit-detail span { font-weight:600; }
+.pit-free { color:var(--lime); font-size:9px; font-weight:700; }
+
+/* ── EDIT FORM ── */
+.edit-panel { display:none; padding:12px 0 4px; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.edit-panel.open { display:grid; }
+.edit-group { display:flex; flex-direction:column; gap:3px; }
+.edit-label { font-size:8px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.edit-actions { grid-column:1/-1; display:flex; gap:8px; justify-content:flex-end; }
+
+input[type=number],input[type=text],select { background:var(--surface); border:1px solid var(--border); border-radius:2px; color:var(--text); font-family:'Barlow Condensed',sans-serif; font-size:13px; padding:6px 8px; width:100%; outline:none; box-sizing:border-box; }
+input:focus,select:focus { border-color:var(--lime); }
+
+.tyre-checks { display:flex; gap:8px; align-items:center; }
+.tyre-check { display:flex; align-items:center; gap:3px; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer; }
+.tyre-check input { accent-color:var(--lime); }
+
+.race-marker { display:flex; align-items:center; gap:8px; padding:8px 16px 8px 53px; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; }
+.race-marker.start { color:var(--lime); }
+.race-marker.end { color:var(--muted); }
+
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; color:var(--muted); gap:12px; }
+.empty-state a { color:var(--lime); text-decoration:none; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="sp-subnav">
+  <a href="stint-setup.html">Setup</a>
+  <a href="stint-summary.html">Summary</a>
+  <a href="stint-plan.html" class="active">Plan</a>
+  <a href="stint-tyres.html">Tyres</a>
+</div>
+
+<div class="plan-page">
+  <div id="content">
+    <div class="empty-state">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">No strategy calculated yet</div>
+      <div>Go to <a href="stint-setup.html">Setup</a> to configure and calculate</div>
+    </div>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+renderHeader(lineupId ? 'lineup' : 'local', 'stint-plan')
+if (_checkPopoutOverlay('stint-plan')) throw ''
+
+const activeScenario = sessionStorage.getItem('sp_scenario') || 'default'
+let lastResult = null
+let editingIdx = -1
+
+// === LOAD DATA ===
+async function loadData() {
+  try {
+    const params = JSON.parse(sessionStorage.getItem('sp_params') || '{}')
+    const drivers = JSON.parse(sessionStorage.getItem('sp_drivers') || '[]')
+    const weather = JSON.parse(sessionStorage.getItem('sp_weather') || '[]')
+    const tyreConfigs = JSON.parse(sessionStorage.getItem('sp_tyre_configs') || '[]')
+    if (!params.race_duration_s) return
+    const result = await StintPlanAPI.calculate(activeScenario, params, drivers, weather, tyreConfigs)
+    lastResult = result
+    renderPlan(result)
+  } catch (err) { console.error('[StintPlan]', err) }
+}
+
+// === RENDER ===
+function renderPlan(r) {
+  const s = r.summary
+  const stints = r.stints
+  const cat = r.category || {}
+  if (!stints.length) return
+
+  let html = ''
+
+  // Mini totals bar
+  const eu = s.energy_unit || 'L'
+  const mode = r.energy_mode || 'fuel'
+  html += `<div class="mini-totals">
+    <div class="mt-item"><span class="mt-label">Laps</span><span class="mt-value lime">${s.total_laps}</span></div>
+    <div class="mt-item"><span class="mt-label">Stints</span><span class="mt-value">${s.pit_stops + 1}</span></div>
+    <div class="mt-item"><span class="mt-label">Pit stops</span><span class="mt-value">${s.pit_stops}</span></div>
+    <div class="mt-item"><span class="mt-label">Finish</span><span class="mt-value lime">${s.predicted_finish}</span></div>
+    <div class="mt-item"><span class="mt-label">Race time</span><span class="mt-value">${fmtDuration(s.total_race_time_s)}</span></div>
+    ${cat.tyre_allocation < 999 ? `<div class="mt-item"><span class="mt-label">Tyres</span><span class="mt-value">${cat.tyres_used} / ${cat.tyre_allocation}</span></div>` : ''}
+    ${cat.short ? `<div class="mt-item"><span class="mt-label">Cat</span><span class="mt-value" style="color:${CAT_COLORS[r.params?.category] || 'var(--lime)'}">${esc(cat.short)}</span></div>` : ''}
+  </div>`
+
+  // Timeline bar
+  const totalDur = stints[stints.length - 1].end_elapsed_s
+  const p = r.params || {}
+  html += '<div class="timeline-container"><div class="timeline-bar">'
+  for (const st of stints) {
+    const pct = (st.duration_s / totalDur * 100).toFixed(2)
+    html += `<div class="tl-stint" style="width:${pct}%;background:${st.driver_color}" onclick="scrollToStint(${st.id - 1})">`
+    if (parseFloat(pct) > 6) html += `<span>${st.start_clock}</span>`
+    if (parseFloat(pct) > 10) html += `<span style="opacity:.7">${st.laps}L</span>`
+    html += '</div>'
+  }
+  html += '</div>'
+  const axisLabels = []
+  const step = Math.max(3600, totalDur / 6)
+  for (let t = 0; t <= totalDur; t += step) {
+    const h = p.sim_start_hour + (t / 3600) * (p.sim_time_mult || 1)
+    axisLabels.push(`${String(Math.floor(h) % 24).padStart(2, '0')}:00`)
+  }
+  html += `<div class="timeline-axis">${axisLabels.map(l => `<span>${l}</span>`).join('')}</div></div>`
+
+  // Stint list
+  html += '<div class="stint-list">'
+  html += `<div class="race-marker start"><div class="pit-dot" style="background:var(--lime)"></div>Race Start \u2014 ${stints[0].start_clock}</div>`
+
+  stints.forEach((st, i) => {
+    const cpd = (r.compounds || {})[st.compound] || {}
+    const isEditing = editingIdx === i
+    const te = st.tyres_end || {}
+
+    html += `
+      <div class="stint-card" id="stint-${i}" style="border-left-color:${st.driver_color}">
+        <div class="stint-num">${st.id}</div>
+        <div class="stint-body ${isEditing ? 'editing' : ''}" onclick="toggleEdit(${i})">
+          <div class="stint-top">
+            <div class="stint-driver"><div class="stint-driver-dot" style="background:${st.driver_color}"></div>${esc(st.driver_name)}</div>
+            <div class="stint-clock">${st.start_clock} \u2192 ${st.end_clock}${st.track_temp_c ? ` \u00B7 ${st.track_temp_c}\u00B0C` : ''}</div>
+          </div>
+          <div class="stint-stats">
+            <div><div class="ss-label">Laps</div><div class="ss-value">${st.laps}</div></div>
+            <div><div class="ss-label">Duration</div><div class="ss-value">${fmtDuration(st.duration_s)}</div></div>
+            <div><div class="ss-label">${mode === 've' ? 'Energy' : 'Fuel'}</div><div class="ss-value">${st.fuel_load_l || st.energy_load}${eu}</div></div>
+            <div><div class="ss-label">${mode === 've' ? '%/Lap' : 'L/Lap'}</div><div class="ss-value">${st.fuel_per_lap_l || '\u2014'}${mode === 've' ? '%' : ''}</div></div>
+            <div><div class="ss-label">Lap range</div><div class="ss-value">${st.start_lap}\u2013${st.end_lap}</div></div>
+          </div>
+          ${st.fuel_per_lap_l ? `<div class="consumption-target">\u{1F3AF} Target: ${st.fuel_per_lap_l}${mode === 've' ? '% / lap' : 'L / lap'} — predicted consumption to maintain for this stint</div>` : ''}
+          <div class="tyre-grid">
+            ${CORNERS.map(c => {
+              const v = Math.round(te[c] || 0)
+              const col = tyreHealthColor(v)
+              const cornerCompound = (st.compounds || {})[c] || st.compound || 'medium'
+              return `<div class="tyre-cell">
+                <img src="${tyreIconSrc(cornerCompound)}" alt="${cornerCompound}" title="${CORNER_LABELS[c]} — ${cornerCompound}">
+                <span>${CORNER_LABELS[c]}</span>
+                <div class="tyre-health-bar"><div class="tyre-health-fill" style="width:${v}%;background:${col}"></div></div>
+                <span class="tyre-pct" style="color:${col}">${v}%</span>
+              </div>`
+            }).join('')}
+          </div>
+          <div class="edit-panel ${isEditing ? 'open' : ''}" onclick="event.stopPropagation()">
+            ${isEditing ? renderEditForm(i, st, r) : ''}
+          </div>
+        </div>
+      </div>`
+
+    // Pit separator with detailed breakdown
+    if (i < stints.length - 1) {
+      const nextPit = stints[i + 1].pit_stop || {}
+      const numTyres = nextPit.num_tyres || 0
+      const tyreLabel = numTyres === 0 ? '<span style="color:var(--lime)">No tyre change</span>'
+        : numTyres === 4 ? '4 tyres' : `${numTyres} tyre${numTyres > 1 ? 's' : ''}`
+      const freeTag = nextPit.free_tyre_change && numTyres > 0 ? '<span class="pit-free">FREE</span>' : ''
+      html += `<div class="pit-sep">
+        <div class="pit-dot"></div>
+        <span class="pit-tag">PIT STOP</span>
+        <div class="pit-detail">
+          <span>${nextPit.total_time_s || '?'}s</span>
+          <span title="T_fuel=${nextPit.t_fuel_s || 0}s">${nextPit.fuel_volume_l || 0}L</span>
+          <span title="T_tyres=${nextPit.t_tyres_s || 0}s">${tyreLabel} ${freeTag}</span>
+          ${nextPit.driver_change ? `<span style="color:var(--lime)">\u2192 ${esc(nextPit.driver_change_to)}</span>` : ''}
+        </div>
+      </div>`
+    }
+  })
+
+  html += `<div class="race-marker end"><div class="pit-dot"></div>Checkered Flag \u2014 ${stints[stints.length - 1].end_clock}</div>`
+  html += '</div>'
+
+  document.getElementById('content').innerHTML = html
+}
+
+// === EDIT ===
+function toggleEdit(idx) {
+  editingIdx = editingIdx === idx ? -1 : idx
+  if (lastResult) renderPlan(lastResult)
+}
+
+function renderEditForm(idx, st, r) {
+  const driverOpts = JSON.parse(sessionStorage.getItem('sp_drivers') || '[]')
+    .map(d => `<option value="${esc(d.id)}" ${d.id === st.driver_id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')
+  const cpdOpts = Object.entries(r.compounds || {})
+    .map(([k, c]) => `<option value="${k}" ${k === st.compound ? 'selected' : ''}>${c.label}</option>`).join('')
+  const changes = st.tyre_changes || CORNERS
+
+  return `
+    <div class="edit-group"><div class="edit-label">Driver</div><select onchange="doAdjust(${idx},{driver_id:this.value})">${driverOpts}</select></div>
+    <div class="edit-group"><div class="edit-label">Laps</div><input type="number" value="${st.laps}" min="1" onchange="doAdjust(${idx},{laps:parseInt(this.value)})"></div>
+    <div class="edit-group"><div class="edit-label">Compound</div><select onchange="doAdjust(${idx},{compound:this.value})">${cpdOpts}</select></div>
+    <div class="edit-group"><div class="edit-label">L&amp;C intensity (%)</div><input type="number" value="${st.lift_coast_pct || 0}" step="5" min="0" max="100" onchange="doAdjust(${idx},{lift_coast_pct:parseInt(this.value)})"></div>
+    <div class="edit-group" style="grid-column:span 2">
+      <div class="edit-label">Tyre changes at pit</div>
+      <div class="tyre-checks">
+        ${CORNERS.map(c => `<label class="tyre-check"><input type="checkbox" ${changes.includes(c) ? 'checked' : ''} onchange="updateTyreChanges(${idx})" data-corner="${c}">${CORNER_LABELS[c]}</label>`).join('')}
+      </div>
+    </div>
+    <div class="edit-actions">
+      <button class="btn-ghost" style="padding:5px 12px;font-size:10px;color:var(--red);border-color:var(--red)" onclick="doRemove(${idx})">Remove stint</button>
+      <button class="btn-ghost" style="padding:5px 12px;font-size:10px" onclick="doAddAfter(${idx})">+ Add after</button>
+    </div>`
+}
+
+function updateTyreChanges(idx) {
+  const checks = document.querySelectorAll('.edit-panel.open input[data-corner]')
+  const selected = []
+  checks.forEach(cb => { if (cb.checked) selected.push(cb.dataset.corner) })
+  doAdjust(idx, { tyre_changes: selected })
+}
+
+async function doAdjust(idx, changes) {
+  try {
+    const r = await StintPlanAPI.adjustStint(activeScenario, idx, changes)
+    lastResult = r; renderPlan(r)
+  } catch (e) { console.error(e) }
+}
+
+async function doRemove(idx) {
+  try {
+    editingIdx = -1
+    const r = await StintPlanAPI.removeStint(activeScenario, idx)
+    lastResult = r; renderPlan(r)
+  } catch (e) { console.error(e) }
+}
+
+async function doAddAfter(idx) {
+  try {
+    const r = await StintPlanAPI.addStint(activeScenario, idx)
+    lastResult = r; editingIdx = idx + 1; renderPlan(r)
+  } catch (e) { console.error(e) }
+}
+
+function scrollToStint(idx) {
+  const el = document.getElementById(`stint-${idx}`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+// === INIT ===
+loadData()
+</script>
+</body>
+</html>

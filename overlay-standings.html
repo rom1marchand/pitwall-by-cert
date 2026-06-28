@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Standings</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  .widget { padding:8px 10px; min-width:280px; }
+
+  .st-table { display:flex; flex-direction:column; gap:2px; }
+
+  .st-row {
+    display:grid; grid-template-columns:22px 1fr 52px 56px;
+    gap:0 6px; align-items:center;
+    padding:4px 7px; border-radius:4px;
+    background:rgba(255,255,255,0.03);
+    border-left:3px solid transparent;
+    font-variant-numeric:tabular-nums;
+    position:relative; overflow:hidden;
+  }
+  .st-row.me {
+    background:rgba(200,255,0,0.1);
+    border-left-color:var(--lime);
+  }
+  .st-row.ahead  { border-left-color:rgba(255,68,68,0.4); }
+  .st-row.behind { border-left-color:rgba(59,167,255,0.4); }
+
+  .st-pos { font-size:13px; font-weight:900; text-align:center; color:var(--muted2); }
+  .st-row.me .st-pos { color:var(--lime); }
+
+  .st-name-col { display:flex; align-items:center; gap:4px; min-width:0; }
+  .st-name { font-size:12px; font-weight:700; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .st-row.me .st-name { color:#fff; font-weight:900; }
+
+  .badge {
+    flex-shrink:0; font-size:7px; font-weight:900; padding:1px 3px;
+    border-radius:2px; letter-spacing:0.08em; line-height:1.3; text-transform:uppercase;
+  }
+  .badge.pit   { background:var(--amber); color:#000; }
+  .badge.class { background:rgba(255,255,255,0.1); color:var(--muted2); border:1px solid var(--border2); }
+
+  .st-gap { text-align:right; font-size:11px; font-weight:900; color:var(--muted2); }
+  .st-delta {
+    text-align:right; font-size:12px; font-weight:900;
+    padding:2px 5px; border-radius:3px; letter-spacing:0.02em;
+  }
+  .st-delta.gain { color:var(--green); background:rgba(29,185,84,0.12); }
+  .st-delta.loss { color:var(--red);   background:rgba(255,68,68,0.15); }
+  .st-delta.flat { color:var(--muted); }
+  .st-delta.me   { color:var(--lime); background:transparent; font-size:10px; }
+
+  .st-sep { height:1px; background:linear-gradient(90deg,var(--border2),transparent); margin:2px 0; }
+
+  /* Sector-delta page uses a different grid (3 sector columns) */
+  .sec-row {
+    display:grid; grid-template-columns:22px 1fr repeat(3, 42px);
+    gap:0 4px; align-items:center;
+    padding:4px 7px; border-radius:4px;
+    background:rgba(255,255,255,0.03);
+    border-left:3px solid transparent;
+    font-variant-numeric:tabular-nums;
+  }
+  .sec-row.me    { background:rgba(200,255,0,0.1); border-left-color:var(--lime); }
+  .sec-cell { text-align:right; font-size:11px; font-weight:900; }
+  .sec-cell.gain { color:var(--green); }
+  .sec-cell.loss { color:var(--red); }
+  .sec-cell.flat { color:var(--muted); }
+  .sec-head {
+    display:grid; grid-template-columns:22px 1fr repeat(3, 42px);
+    gap:0 4px; font-size:8px; font-weight:900; color:var(--muted);
+    letter-spacing:0.12em; text-transform:uppercase;
+    padding:1px 7px 3px; border-bottom:1px solid var(--border2); margin-bottom:2px;
+  }
+  .sec-head div:nth-child(n+3) { text-align:right; }
+
+  .pages { flex:1; min-height:0; position:relative; }
+  .page  { display:flex; flex-direction:column; gap:3px; height:100%; }
+
+  body.edit .widget{outline-color:var(--lime);-webkit-app-region:drag;cursor:move;}
+  body.not-driving:not(.edit):not(.force-show) .widget{opacity:0;pointer-events:none;transition:opacity 0.3s;}
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title" id="page-title">Last-lap Δ</div>
+    <div class="dot" id="dot"></div>
+  </div>
+
+  <div class="pages">
+    <div class="page" id="page-last">
+      <div class="st-table" id="tbl-last"></div>
+    </div>
+    <div class="page" id="page-avg3" style="display:none">
+      <div class="st-table" id="tbl-avg3"></div>
+    </div>
+    <div class="page" id="page-avg5" style="display:none">
+      <div class="st-table" id="tbl-avg5"></div>
+    </div>
+    <div class="page" id="page-sectors" style="display:none">
+      <div class="sec-head"><div></div><div></div><div>S1</div><div>S2</div><div>S3</div></div>
+      <div class="st-table" id="tbl-sectors"></div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  // ─── Local rolling history per competitor ────────────────────────────
+  // Keyed by competitor id (or name fallback). Stores the last N observed
+  // last_lap values so we can compute AVG3 / AVG5.
+  const lapHist = new Map();   // key -> { laps:[{t, lap}], lastSeenLapNum }
+  const MAX_HIST = 10;
+
+  function keyOf(c) { return (c.id != null) ? 'id:' + c.id : 'n:' + (c.name || c.driver_name || '?'); }
+
+  function pushLap(c) {
+    const k = keyOf(c);
+    const t = c.last_lap ?? c.last_lap_time ?? c.lastLap;
+    const lapNum = c.total_laps ?? c.lap_number ?? c.completed_laps;
+    if (t == null || !isFinite(t) || t <= 0) return;
+    let h = lapHist.get(k);
+    if (!h) { h = { laps: [], lastSeenLapNum: null }; lapHist.set(k, h); }
+    // Only record when a new lap finishes (avoid duplicating the same time every frame)
+    if (lapNum != null) {
+      if (h.lastSeenLapNum === lapNum) return;
+      h.lastSeenLapNum = lapNum;
+    } else {
+      // No lap counter → only record when time changes
+      const tail = h.laps[h.laps.length - 1];
+      if (tail && Math.abs(tail.t - t) < 1e-3) return;
+    }
+    h.laps.push({ t, lap: lapNum });
+    while (h.laps.length > MAX_HIST) h.laps.shift();
+  }
+
+  function avgN(c, n) {
+    const h = lapHist.get(keyOf(c));
+    if (!h || h.laps.length === 0) return null;
+    const slice = h.laps.slice(-n);
+    if (!slice.length) return null;
+    return slice.reduce((a, b) => a + b.t, 0) / slice.length;
+  }
+
+  function lastLapOf(c) {
+    const h = lapHist.get(keyOf(c));
+    if (!h || !h.laps.length) return c.last_lap ?? c.last_lap_time ?? null;
+    return h.laps[h.laps.length - 1].t;
+  }
+
+  // ─── Formatting ──────────────────────────────────────────────────────
+  function fmtGap(v) {
+    if (v == null || !isFinite(v)) return '—';
+    const a = Math.abs(v);
+    if (a >= 60) return (v > 0 ? '+' : '-') + (a / 60).toFixed(1) + 'm';
+    return (v > 0 ? '+' : '-') + a.toFixed(3);
+  }
+  function fmtDelta(v, dp = 3) {
+    if (v == null || !isFinite(v)) return '—';
+    const sign = v > 0 ? '+' : (v < 0 ? '-' : ' ');
+    return sign + Math.abs(v).toFixed(dp);
+  }
+  function deltaClass(v) {
+    if (v == null || !isFinite(v)) return 'flat';
+    if (Math.abs(v) < 0.01) return 'flat';
+    // Convention: v = competitor_time - my_time
+    //   competitor slower (v > 0) → I gained → GAIN (green)
+    //   competitor faster (v < 0) → I lost   → LOSS (red)
+    return v > 0 ? 'gain' : 'loss';
+  }
+
+  // ─── Row builders ────────────────────────────────────────────────────
+  function buildStandingRow(c, isMe, gap, delta) {
+    const row = document.createElement('div');
+    const isAhead = !isMe && gap != null && gap < 0;
+    const isBehind = !isMe && gap != null && gap > 0;
+    row.className = 'st-row' + (isMe ? ' me' : (isAhead ? ' ahead' : (isBehind ? ' behind' : '')));
+
+    const pos = document.createElement('div');
+    pos.className = 'st-pos'; pos.textContent = c.position ?? '—';
+    row.appendChild(pos);
+
+    const nameCol = document.createElement('div');
+    nameCol.className = 'st-name-col';
+    const name = document.createElement('span');
+    name.className = 'st-name';
+    name.textContent = c.name || c.driver_name || c.short_name || c.car_number || '—';
+    nameCol.appendChild(name);
+    if (c.in_pit || c.in_pits || c.is_in_pit) {
+      const b = document.createElement('span'); b.className = 'badge pit'; b.textContent = 'PIT'; nameCol.appendChild(b);
+    }
+    if (c.vehicle_class) {
+      const b = document.createElement('span'); b.className = 'badge class';
+      b.textContent = c.vehicle_class.slice(0, 4).toUpperCase(); nameCol.appendChild(b);
+    }
+    row.appendChild(nameCol);
+
+    const gapEl = document.createElement('div');
+    gapEl.className = 'st-gap';
+    gapEl.textContent = isMe ? '—' : fmtGap(gap);
+    row.appendChild(gapEl);
+
+    const deltaEl = document.createElement('div');
+    deltaEl.className = 'st-delta ' + (isMe ? 'me' : deltaClass(delta));
+    deltaEl.textContent = isMe ? '● YOU' : fmtDelta(delta);
+    row.appendChild(deltaEl);
+
+    return row;
+  }
+
+  function buildSectorRow(c, isMe, s1d, s2d, s3d) {
+    const row = document.createElement('div');
+    row.className = 'sec-row' + (isMe ? ' me' : '');
+    const pos = document.createElement('div');
+    pos.className = 'st-pos'; pos.textContent = c.position ?? '—';
+    row.appendChild(pos);
+    const name = document.createElement('div');
+    name.className = 'st-name';
+    name.textContent = c.name || c.driver_name || c.short_name || c.car_number || '—';
+    row.appendChild(name);
+    [s1d, s2d, s3d].forEach(v => {
+      const cell = document.createElement('div');
+      cell.className = 'sec-cell ' + (isMe ? 'flat' : deltaClass(v));
+      cell.textContent = isMe ? '—' : fmtDelta(v, 2);
+      row.appendChild(cell);
+    });
+    return row;
+  }
+
+  // ─── Window selection (neighbours around me) ─────────────────────────
+  function windowAroundMe(standings, me, span = 3) {
+    const sorted = [...standings].sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+    const myIdx = sorted.findIndex(c => c.is_player || c.isPlayer || (me && c.position === me.position));
+    const anchor = myIdx >= 0 ? myIdx : 0;
+    const start = Math.max(0, anchor - span);
+    const end = Math.min(sorted.length, anchor + span + 1);
+    return { sorted, anchor, slice: sorted.slice(start, end), startIdx: start };
+  }
+
+  function gapToMe(c, me) {
+    if (!me) return null;
+    // Prefer direct "gap to player" if backend provides it
+    if (c.gap_to_player != null) return c.gap_to_player;
+    if (c.time_behind_player != null) return c.time_behind_player;
+    // Fallback: derive from time_behind_leader
+    const mine = me.time_behind_leader;
+    const theirs = c.time_behind_leader;
+    if (mine != null && theirs != null) return theirs - mine;
+    return null;
+  }
+
+  // ─── Main render ─────────────────────────────────────────────────────
+  function renderDeltaPage(tblId, avgWindow) {
+    const st = Overlay.state.standings || [];
+    const tbl = $(tblId); tbl.innerHTML = '';
+    if (!Array.isArray(st) || !st.length) return;
+
+    const me = st.find(c => c.is_player || c.isPlayer);
+    if (!me) return;
+
+    // Update history for every competitor
+    for (const c of st) pushLap(c);
+
+    const myRef = (avgWindow === 1) ? lastLapOf(me) : avgN(me, avgWindow);
+    const { slice } = windowAroundMe(st, me, 3);
+
+    for (const c of slice) {
+      const isMe = c.is_player || c.isPlayer;
+      const gap = gapToMe(c, me);
+      let theirRef;
+      if (avgWindow === 1) theirRef = lastLapOf(c);
+      else                 theirRef = avgN(c, avgWindow);
+      const delta = (theirRef != null && myRef != null) ? (theirRef - myRef) : null;
+      tbl.appendChild(buildStandingRow(c, isMe, gap, delta));
+    }
+  }
+
+  function renderSectorsPage() {
+    const st = Overlay.state.standings || [];
+    const tbl = $('tbl-sectors'); tbl.innerHTML = '';
+    if (!Array.isArray(st) || !st.length) return;
+    const me = st.find(c => c.is_player || c.isPlayer);
+    if (!me) return;
+    const getS = (c, n) => c['last_s' + n] ?? c['last_sector_' + n] ?? c['cur_s' + n] ?? c['best_s' + n] ?? null;
+    const mS1 = getS(me, 1), mS2 = getS(me, 2), mS3 = getS(me, 3);
+
+    const { slice } = windowAroundMe(st, me, 3);
+    for (const c of slice) {
+      const isMe = c.is_player || c.isPlayer;
+      const s1 = getS(c, 1), s2 = getS(c, 2), s3 = getS(c, 3);
+      const d1 = (s1 != null && mS1 != null) ? s1 - mS1 : null;
+      const d2 = (s2 != null && mS2 != null) ? s2 - mS2 : null;
+      const d3 = (s3 != null && mS3 != null) ? s3 - mS3 : null;
+      tbl.appendChild(buildSectorRow(c, isMe, d1, d2, d3));
+    }
+  }
+
+  function renderAll() {
+    const idx = Overlay.currentPageIdx;
+    // Always keep history fresh so other pages are ready on switch
+    const st = Overlay.state.standings || [];
+    for (const c of st) pushLap(c);
+    // Render only the active page for cost; breadcrumb handles the rest
+    if (idx === 0) renderDeltaPage('tbl-last', 1);
+    else if (idx === 1) renderDeltaPage('tbl-avg3', 3);
+    else if (idx === 2) renderDeltaPage('tbl-avg5', 5);
+    else if (idx === 3) renderSectorsPage();
+  }
+
+  // ─── Pages registration ──────────────────────────────────────────────
+  Overlay.registerPages([
+    { id: 'last',    el: '#page-last',    onEnter() { $('page-title').textContent = 'Last-lap Δ'; renderDeltaPage('tbl-last', 1); } },
+    { id: 'avg3',    el: '#page-avg3',    onEnter() { $('page-title').textContent = 'AVG3 Δ';    renderDeltaPage('tbl-avg3', 3); } },
+    { id: 'avg5',    el: '#page-avg5',    onEnter() { $('page-title').textContent = 'AVG5 Δ';    renderDeltaPage('tbl-avg5', 5); } },
+    { id: 'sectors', el: '#page-sectors', onEnter() { $('page-title').textContent = 'Sector Δ';  renderSectorsPage(); } },
+  ]);
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: renderAll,
+  });
+</script>
+</body>
+</html>

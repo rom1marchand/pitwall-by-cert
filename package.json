@@ -1,0 +1,44 @@
+{
+  "name": "pitwall-by-cert",
+  "version": "0.4.63",
+  "description": "Sim Racing Strategy Tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.pitwallbycert.app",
+    "productName": "PitWall Powered by CERT",
+    "files": [
+      "**/*",
+      "assets/**/*"
+    ],
+    "icon": "assets/icon.png",
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": "nsis"
+    },
+    "mac": {
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "icon": "assets/icon.png"
+    },
+    "extraResources": [
+      {
+        "from": "py_dist",
+        "to": "py_dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  },
+  "author": "App by Romain Marchand - LMU Acquisation Data by S.Victor/Tiny Pedal",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

@@ -1,0 +1,31 @@
+[
+  {
+    "id": "widget-delta",
+    "type": "overlay-delta",
+    "displayIndex": 0,
+    "x": 800,
+    "y": 900,
+    "w": 320,
+    "h": 100
+  },
+  {
+    "id": "widget-tyres",
+    "type": "overlay-tyres",
+    "displayIndex": 1,
+    "x": 50,
+    "y": 400,
+    "w": 250,
+    "h": 400
+  },
+  {
+    "id": "engineer",
+    "type": "overlay-engineer",
+    "displayIndex": 0,
+    "x": 40,
+    "y": 40,
+    "w": 320,
+    "h": 140,
+    "ratio": 0,
+    "enabled": true
+  }
+]

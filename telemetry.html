@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Telemetry — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="telemetry-buffer.js"></script>
+<script src="telemetry-storage.js"></script>
+<script src="telemetry-vps.js"></script>
+<script src="telemetry-canvas.js"></script>
+<style>
+.tl-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  grid-template-rows: auto 1fr;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+/* ── TOOLBAR ── */
+.tl-toolbar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.tl-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 900; text-transform: uppercase;
+  letter-spacing: .04em; margin-right: auto;
+}
+.tl-meta-chip {
+  padding: 4px 10px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 6px;
+}
+.tl-meta-chip b { color: var(--text); font-weight: 800; }
+.tl-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+  transition: background .3s, box-shadow .3s; }
+.tl-status-dot.on   { background: var(--lime); box-shadow: 0 0 6px var(--lime); }
+.tl-status-dot.err  { background: var(--red); }
+
+.tl-btn {
+  padding: 5px 12px; background: transparent; border: 1px solid var(--border);
+  border-radius: 3px; color: var(--muted); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  cursor: pointer; transition: all .15s;
+}
+.tl-btn:hover:not(:disabled) { border-color: var(--lime); color: var(--lime); }
+.tl-btn:disabled { opacity: .4; cursor: not-allowed; }
+.tl-btn.red   { border-color: var(--red); color: var(--red); }
+.tl-btn.red:hover:not(:disabled)  { background: rgba(255,59,59,.08); }
+
+/* ── CHARTS AREA ── */
+.tl-charts {
+  padding: 10px 12px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--black);
+}
+.tl-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 3px; padding: 8px 10px 6px;
+  display: flex; flex-direction: column;
+}
+.tl-card-hd {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.tl-card-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted);
+}
+.tl-card-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 900; line-height: 1; margin-left: auto;
+  color: var(--text);
+}
+.tl-card-val small { font-size: 10px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+.tl-canvas-wrap { position: relative; }
+.tl-canvas-wrap canvas { display: block; width: 100%; }
+
+/* ── SIDE PANEL ── */
+.tl-side {
+  border-left: 1px solid var(--border);
+  background: var(--card);
+  overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.tl-side-section-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+
+.tl-legend { display: flex; flex-direction: column; gap: 4px; }
+.tl-legend-item {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+.tl-legend-swatch { width: 16px; height: 3px; border-radius: 1px; }
+
+.tl-kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tl-kpi-cell {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 3px; padding: 8px 10px;
+}
+.tl-kpi-k {
+  font-size: 8px; font-weight: 700; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+}
+.tl-kpi-v {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800; line-height: 1;
+}
+
+.tl-track-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 3px; padding: 8px; height: 220px; position: relative;
+}
+.tl-track-card canvas { display:block; width:100%; height:100%; }
+
+/* ── EMPTY STATE ── */
+.tl-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 300px; gap: 10px; color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* Toast */
+#toast {
+  position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:3px;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; z-index:9999;
+  transform:translateY(20px); opacity:0; transition:transform .2s, opacity .2s;
+  pointer-events:none;
+}
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.success { background:var(--lime); color:var(--black); }
+#toast.error   { background:var(--red); color:#fff; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<header id="app-header"></header>
+
+<div class="tl-layout">
+
+  <!-- Toolbar -->
+  <div class="tl-toolbar">
+    <div class="tl-title">Live Telemetry</div>
+    <div class="tl-meta-chip">
+      <div class="tl-status-dot" id="tl-conn"></div>
+      <span id="tl-conn-text">Connecting…</span>
+    </div>
+    <div class="tl-meta-chip"><span>Track</span> <b id="tl-track">—</b></div>
+    <div class="tl-meta-chip"><span>Car</span> <b id="tl-car">—</b></div>
+    <div class="tl-meta-chip"><span>Laps</span> <b id="tl-laps">0</b> / <span id="tl-keep">3</span></div>
+    <button class="tl-btn red" id="tl-save-btn" onclick="_saveBuffer()" disabled>Save Buffer</button>
+    <button class="tl-btn" onclick="_navigate('telemetry-record.html')">Library</button>
+  </div>
+
+  <!-- Charts -->
+  <div class="tl-charts" id="tl-charts">
+    <div class="tl-empty" id="tl-empty">
+      <div class="spinner"></div>
+      <span>Waiting for live telemetry…</span>
+    </div>
+    <div id="tl-cards" style="display:none; flex-direction:column; gap:8px;">
+      <div class="tl-card">
+        <div class="tl-card-hd">
+          <div class="tl-card-label">Speed</div>
+          <div class="tl-card-val"><span id="kv-speed">0</span><small>km/h</small></div>
+        </div>
+        <div class="tl-canvas-wrap" style="height:160px"><canvas id="c-speed"></canvas></div>
+      </div>
+
+      <div class="tl-card">
+        <div class="tl-card-hd">
+          <div class="tl-card-label">Throttle / Brake</div>
+          <div class="tl-card-val">
+            <span id="kv-thr" style="color:var(--lime)">0</span>/<span id="kv-brk" style="color:var(--red)">0</span><small>%</small>
+          </div>
+        </div>
+        <div class="tl-canvas-wrap" style="height:120px"><canvas id="c-pedals"></canvas></div>
+      </div>
+
+      <div class="tl-card">
+        <div class="tl-card-hd">
+          <div class="tl-card-label">Gear</div>
+          <div class="tl-card-val"><span id="kv-gear">N</span></div>
+        </div>
+        <div class="tl-canvas-wrap" style="height:90px"><canvas id="c-gear"></canvas></div>
+      </div>
+
+      <div class="tl-card">
+        <div class="tl-card-hd">
+          <div class="tl-card-label">RPM</div>
+          <div class="tl-card-val"><span id="kv-rpm">0</span></div>
+        </div>
+        <div class="tl-canvas-wrap" style="height:90px"><canvas id="c-rpm"></canvas></div>
+      </div>
+
+      <div class="tl-card">
+        <div class="tl-card-hd">
+          <div class="tl-card-label">Steering</div>
+          <div class="tl-card-val"><span id="kv-steer">0</span><small>°</small></div>
+        </div>
+        <div class="tl-canvas-wrap" style="height:90px"><canvas id="c-steer"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side panel -->
+  <aside class="tl-side">
+    <div>
+      <div class="tl-side-section-label">Laps in Buffer</div>
+      <div class="tl-legend" id="tl-legend"></div>
+    </div>
+
+    <div>
+      <div class="tl-side-section-label">Current</div>
+      <div class="tl-kpi">
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">Fuel</div><div class="tl-kpi-v" id="kv-fuel">—</div></div>
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">V-Energy</div><div class="tl-kpi-v" id="kv-ve">—</div></div>
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">Tyre FL</div><div class="tl-kpi-v" id="kv-tfl">—</div></div>
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">Tyre FR</div><div class="tl-kpi-v" id="kv-tfr">—</div></div>
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">Tyre RL</div><div class="tl-kpi-v" id="kv-trl">—</div></div>
+        <div class="tl-kpi-cell"><div class="tl-kpi-k">Tyre RR</div><div class="tl-kpi-v" id="kv-trr">—</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="tl-side-section-label">Track</div>
+      <div class="tl-track-card"><canvas id="c-map"></canvas></div>
+    </div>
+  </aside>
+</div>
+
+<div id="toast"></div>
+
+<script>
+injectSharedCSS()
+Auth.requireAuth()
+
+const lineupId = localStorage.getItem('pw_active_lineup') || Nav.get('lineup_id') || ''
+
+// ─── TELEMETRY BUFFER ──────────────────────────────────────────────────────
+const buf = new TelemetryBuffer({ keepLaps: 3, sampleHzCap: 30 })
+
+// ─── SOCKET ────────────────────────────────────────────────────────────────
+const baseHandlers = {
+  onStatus(s) {
+    const dot  = document.getElementById('tl-conn')
+    const text = document.getElementById('tl-conn-text')
+    dot.classList.remove('on', 'err')
+    if (s === 'connected')     { dot.classList.add('on');  text.textContent = 'Connected' }
+    else if (s === 'error')    { dot.classList.add('err'); text.textContent = 'Error' }
+    else                       { text.textContent = 'Disconnected' }
+  },
+  onSession(s) {
+    if (s.track) document.getElementById('tl-track').textContent = s.track
+    if (s.car)   document.getElementById('tl-car').textContent   = s.car
+  },
+  onDriver(d) {
+    _updateKPIs(d)
+  },
+}
+
+const socket = new LocalSocket(buf.wrap(baseHandlers))
+socket.connect()
+
+// ─── KPIs ──────────────────────────────────────────────────────────────────
+function _updateKPIs(d) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  set('kv-speed', Math.round(d.speed_kmh || 0))
+  set('kv-thr',   Math.round((d.throttle || 0) * 100))
+  set('kv-brk',   Math.round((d.brake    || 0) * 100))
+  set('kv-gear',  _gearLabel(d.gear))
+  set('kv-rpm',   Math.round(d.rpm || 0))
+  set('kv-steer', Math.round((d.steering || 0) * 180))
+  set('kv-fuel',  d.fuel_liters != null ? (+d.fuel_liters).toFixed(1) + ' L' : '—')
+  set('kv-ve',    d.virtual_energy != null ? Math.round(d.virtual_energy) + '%' : '—')
+  set('kv-tfl',   d.tyre_temp_fl != null ? Math.round(d.tyre_temp_fl) + '°' : '—')
+  set('kv-tfr',   d.tyre_temp_fr != null ? Math.round(d.tyre_temp_fr) + '°' : '—')
+  set('kv-trl',   d.tyre_temp_rl != null ? Math.round(d.tyre_temp_rl) + '°' : '—')
+  set('kv-trr',   d.tyre_temp_rr != null ? Math.round(d.tyre_temp_rr) + '°' : '—')
+}
+function _gearLabel(g) {
+  if (g == null) return '—'
+  if (g === 0)   return 'N'
+  if (g < 0)     return 'R'
+  return String(g)
+}
+
+// ─── RENDER LOOP ──────────────────────────────────────────────────────────
+const TC = window.TelemetryCanvas
+let _rafId = 0
+
+function _render() {
+  _rafId = requestAnimationFrame(_render)
+  const laps = buf.laps
+  if (!laps.length || !laps.some(l => l.samples.length >= 2)) {
+    document.getElementById('tl-empty').style.display = 'flex'
+    document.getElementById('tl-cards').style.display = 'none'
+    return
+  }
+  document.getElementById('tl-empty').style.display = 'none'
+  document.getElementById('tl-cards').style.display = 'flex'
+  document.getElementById('tl-laps').textContent = laps.length
+  document.getElementById('tl-save-btn').disabled = !laps.some(l => l.samples.length > 10)
+
+  // X axis = seconds since first sample in oldest kept lap
+  const t0 = laps[0].samples[0]?.t || 0
+  const tN = laps[laps.length - 1].samples.slice(-1)[0]?.t || (t0 + 1)
+  const xMin = 0
+  const xMax = Math.max(1, (tN - t0) / 1000)
+
+  const rebased = laps.map(lap => lap.samples.map(s => ({ ...s, _t: (s.t - t0) / 1000 })))
+
+  _renderLegend(laps)
+  _renderChart('c-speed',  rebased, 'speed_kmh', xMin, xMax, { yMin: 0, yMax: 350, yTicks: 5 })
+  _renderPedals('c-pedals', rebased, xMin, xMax)
+  _renderChart('c-gear',   rebased, 'gear', xMin, xMax, { yMin: -1, yMax: 8, yTicks: 3, stepped: true })
+  _renderChart('c-rpm',    rebased, 'rpm',  xMin, xMax, { yMin: 0, yMax: 9000, yTicks: 3 })
+  _renderChart('c-steer',  rebased, 'steering', xMin, xMax, { yMin: -1, yMax: 1, yTicks: 2 })
+  _renderMap()
+}
+
+function _renderLegend(laps) {
+  const el = document.getElementById('tl-legend')
+  const out = laps.slice().reverse().map((l, i) => {
+    const color = TC.LAP_COLORS[i] || TC.COLORS.muted
+    const cur = i === 0 ? ' ●' : ''
+    return `<div class="tl-legend-item">
+      <div class="tl-legend-swatch" style="background:${color}"></div>
+      Lap ${l.lap_num}${cur}
+      <span style="margin-left:auto;color:var(--muted);font-weight:600">${l.samples.length} pts</span>
+    </div>`
+  }).join('')
+  el.innerHTML = out
+}
+
+function _renderChart(canvasId, rebased, key, xMin, xMax, o) {
+  const canvas = document.getElementById(canvasId); if (!canvas) return
+  const { ctx, w, h } = TC.fitCanvas(canvas)
+  TC.clear(ctx, w, h)
+
+  const box = { x: 36, y: 6, w: w - 42, h: h - 18 }
+  TC.drawGrid(ctx, box, { xMin, xMax, yMin: o.yMin, yMax: o.yMax, yTicks: o.yTicks, xTicks: 6 })
+
+  const reversed = rebased.slice().reverse()   // newest first drawn last (on top)
+  reversed.slice().reverse().forEach((samples, idxFromOldest) => {
+    // compute palette index based on recency (0 = newest)
+    const idx = reversed.length - 1 - idxFromOldest
+    const pts = samples.filter(s => s[key] != null).map(s => ({ x: s._t, y: s[key] }))
+    TC.drawTrace(ctx, box, pts, {
+      xMin, xMax, yMin: o.yMin, yMax: o.yMax,
+      color: TC.LAP_COLORS[idx] || TC.COLORS.muted,
+      lineWidth: idx === 0 ? 1.6 : 1.1,
+      stepped: o.stepped,
+    })
+  })
+}
+
+function _renderPedals(canvasId, rebased, xMin, xMax) {
+  const canvas = document.getElementById(canvasId); if (!canvas) return
+  const { ctx, w, h } = TC.fitCanvas(canvas)
+  TC.clear(ctx, w, h)
+  const box = { x: 36, y: 6, w: w - 42, h: h - 18 }
+  TC.drawGrid(ctx, box, { xMin, xMax, yMin: 0, yMax: 1, yTicks: 2, xTicks: 6,
+    fmtY: v => Math.round(v * 100) })
+
+  const laps = rebased
+  laps.forEach((samples, idxOld) => {
+    const idx = laps.length - 1 - idxOld
+    const alpha = idx === 0 ? 1 : (idx === 1 ? .55 : .35)
+    const thr = samples.filter(s => s.throttle != null).map(s => ({ x: s._t, y: s.throttle }))
+    TC.drawTrace(ctx, box, thr, {
+      xMin, xMax, yMin: 0, yMax: 1,
+      color: `rgba(200,255,0,${alpha})`,
+      lineWidth: idx === 0 ? 1.5 : 1.0,
+    })
+    const brk = samples.filter(s => s.brake != null).map(s => ({ x: s._t, y: s.brake }))
+    TC.drawTrace(ctx, box, brk, {
+      xMin, xMax, yMin: 0, yMax: 1,
+      color: `rgba(255,59,59,${alpha})`,
+      lineWidth: idx === 0 ? 1.5 : 1.0,
+    })
+  })
+}
+
+function _renderMap() {
+  const canvas = document.getElementById('c-map'); if (!canvas) return
+  const { ctx, w, h } = TC.fitCanvas(canvas)
+  TC.clear(ctx, w, h, TC.COLORS.bg)
+  const laps = buf.laps
+  const last = laps[laps.length - 1]
+  if (!last || !last.samples.length) return
+  const samples = last.samples.filter(s => s.pos_x != null && s.pos_z != null)
+  if (samples.length < 2) return
+  TC.drawTrackMap(ctx, { x: 0, y: 0, w, h }, samples, {
+    color: TC.COLORS.lime,
+    lineWidth: 1.6,
+    markerIdx: samples.length - 1,
+    markerColor: TC.COLORS.red,
+  })
+}
+
+// ─── ACTIONS ──────────────────────────────────────────────────────────────
+async function _saveBuffer() {
+  if (!lineupId) { _toast('No active LineUp selected', 'error'); return }
+  try {
+    const snap = buf.snapshot()
+    if (!snap.lap_count) { _toast('Nothing to save yet', 'error'); return }
+    const meta = {
+      name:  `Live ${new Date().toLocaleString()}`,
+      track: snap.track || '',
+      car:   snap.car || '',
+    }
+    const saved = await TelemetryStorage.save(lineupId, snap, meta)
+    _toast(`Saved locally (${Math.round(saved.size_bytes/1024)} KB)`, 'success')
+  } catch (err) {
+    console.error(err)
+    _toast('Save failed: ' + err.message, 'error')
+  }
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────
+function _toast(msg, kind = 'success') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = 'show ' + kind
+  clearTimeout(el._t)
+  el._t = setTimeout(() => { el.className = kind }, 2500)
+}
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await renderHeader(lineupId ? 'lineup' : 'local', 'telemetry')
+  if (typeof _checkPopoutOverlay === 'function' && _checkPopoutOverlay('telemetry')) return
+  if (typeof I18n !== 'undefined' && I18n.apply) I18n.apply()
+  _render()
+})
+
+window.addEventListener('beforeunload', () => {
+  if (_rafId) cancelAnimationFrame(_rafId)
+  if (socket) { socket.reconnect = false; try { socket._ws?.close?.() } catch (_) {} }
+})
+</script>
+</body>
+</html>

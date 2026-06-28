@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Inputs & Telemetry</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,900;1,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lime:#C8FF00; --green:#1DB954; --amber:#FFB020; --red:#FF4444;
+  --blue:#3BA7FF; --purple:#B060FF;
+  --bg:rgba(7,7,7,0.93); --bg2:rgba(255,255,255,0.05); --bg3:rgba(255,255,255,0.09);
+  --muted:#5a5a5a; --muted2:#888; --border:#181818; --border2:#252525;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;width:100%;overflow:hidden;background:transparent;
+  font-family:'Barlow Condensed',sans-serif;user-select:none;color:#e8e8e8;}
+
+.widget{
+  position:absolute;inset:0;
+  background:var(--bg);backdrop-filter:blur(10px) saturate(1.8);
+  border-left:3px solid var(--lime);border-top:1px solid rgba(200,255,0,0.1);
+  border-radius:0 5px 5px 0;
+  box-shadow:0 8px 28px rgba(0,0,0,0.75),inset 1px 0 0 rgba(200,255,0,0.05);
+  padding:9px 11px;display:flex;flex-direction:column;gap:7px;
+  outline:2px dashed transparent;outline-offset:-4px;overflow:hidden;
+}
+.widget::after{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);
+  pointer-events:none;z-index:100;}
+
+/* Gear + Speed */
+.top-row{display:flex;align-items:flex-end;justify-content:space-between;gap:6px;}
+.gear-box{position:relative;width:54px;height:54px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.gear-val{font-size:52px;font-weight:900;line-height:1;letter-spacing:-3px;
+  color:var(--lime);font-variant-numeric:tabular-nums;margin-top:-2px;}
+.gear-box.neutral .gear-val{color:var(--muted2);}
+.gear-box.reverse .gear-val{color:var(--amber);}
+
+.speed-block{flex:1;text-align:right;}
+.speed-val{font-size:34px;font-weight:900;line-height:0.9;
+  color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-1px;}
+.speed-unit{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:0.16em;
+  text-transform:uppercase;display:block;text-align:right;margin-top:1px;}
+.rpm-num{font-size:11px;font-weight:700;color:var(--muted2);
+  font-variant-numeric:tabular-nums;display:block;text-align:right;}
+
+/* RPM bar */
+.rpm-wrap{position:relative;}
+.rpm-bar{height:7px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+.rpm-fill{height:100%;width:0%;
+  background:linear-gradient(90deg,var(--green) 0%,var(--green) 50%,var(--amber) 75%,var(--red) 90%);
+  transition:width 0.04s linear;}
+.rpm-bar.flash{animation:rpm-flash 0.12s alternate infinite;}
+@keyframes rpm-flash{from{background:var(--red);}to{background:rgba(255,60,60,0.2);}}
+.sector-leds{display:flex;gap:2px;margin-top:3px;}
+.s-led{flex:1;height:3px;background:var(--border2);border-radius:1px;transition:background 0.05s;}
+
+/* Pedals */
+.pedals-row{display:flex;gap:6px;height:52px;}
+.pedal{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.pedal-label{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;}
+.pedal-track{width:100%;flex:1;background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);border-radius:2px;position:relative;overflow:hidden;}
+.pedal-fill{position:absolute;bottom:0;width:100%;transition:height 0.04s linear;}
+.pedal-fill.clt{background:var(--blue);}
+.pedal-fill.brk{background:linear-gradient(0deg,var(--red),rgba(255,100,60,0.7));}
+.pedal-fill.thr{background:linear-gradient(0deg,var(--green),rgba(30,185,84,0.7));}
+.pedal-pct{font-size:8px;font-weight:700;color:var(--muted2);
+  font-variant-numeric:tabular-nums;line-height:1;}
+
+/* Steering */
+.steer-row{display:flex;align-items:center;gap:4px;}
+.steer-deg{font-size:9px;font-weight:700;color:var(--muted2);font-variant-numeric:tabular-nums;min-width:30px;}
+.steer-deg.right{text-align:right;}
+.steer-track{flex:1;height:10px;background:rgba(255,255,255,0.05);
+  border:1px solid var(--border2);border-radius:5px;position:relative;}
+.steer-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.15);}
+.steer-dot{position:absolute;top:50%;width:8px;height:8px;
+  background:var(--lime);border-radius:50%;transform:translate(-50%,-50%);
+  transition:left 0.04s linear;
+  box-shadow:0 0 5px rgba(200,255,0,0.5);}
+
+/* Aids & Electronics */
+.aids-row{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;}
+.aid-badge{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:3px;
+  padding:3px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;
+  transition:background 0.15s,border-color 0.15s;
+}
+.aid-badge.active{background:rgba(200,255,0,0.12);border-color:rgba(200,255,0,0.4);}
+.aid-badge.active-red{background:rgba(255,68,68,0.12);border-color:rgba(255,68,68,0.4);}
+.aid-badge.active-blue{background:rgba(59,167,255,0.12);border-color:rgba(59,167,255,0.4);}
+.aid-lbl{font-size:7px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.aid-badge.active .aid-lbl{color:var(--lime);}
+.aid-badge.active-red .aid-lbl{color:var(--red);}
+.aid-badge.active-blue .aid-lbl{color:var(--blue);}
+.aid-val{font-size:11px;font-weight:900;color:var(--muted2);font-variant-numeric:tabular-nums;line-height:1;}
+.aid-badge.active .aid-val{color:var(--lime);}
+.aid-badge.active-red .aid-val{color:var(--red);}
+.aid-badge.active-blue .aid-val{color:var(--blue);}
+
+/* Bottom stats row */
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+.stat-box{background:var(--bg2);border:1px solid var(--border2);border-radius:3px;padding:4px 5px;}
+.stat-lbl{font-size:7px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.stat-val{font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--muted2);}
+.stat-bar{height:3px;background:rgba(255,255,255,0.07);border-radius:1px;margin-top:2px;overflow:hidden;}
+.stat-bar-fill{height:100%;background:var(--amber);transition:width 0.1s linear;}
+
+/* FFB */
+.ffb-row{display:flex;align-items:center;gap:6px;}
+.ffb-lbl{font-size:7px;font-weight:900;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;width:20px;}
+.ffb-track{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+.ffb-fill{height:100%;background:var(--amber);transition:width 0.04s linear;}
+.ffb-fill.clip{background:var(--red);box-shadow:0 0 6px var(--red);}
+
+/* Warnings */
+.warn-strip{
+  display:none;align-items:center;justify-content:center;gap:5px;
+  background:rgba(255,68,68,0.15);border:1px solid rgba(255,68,68,0.4);border-radius:3px;
+  padding:3px 6px;font-size:9px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;color:var(--red);
+}
+.warn-strip.on{display:flex;}
+
+body.edit .widget{outline-color:var(--lime);-webkit-app-region:drag;cursor:move;}
+body.not-driving:not(.edit):not(.force-show) .widget{opacity:0;pointer-events:none;transition:opacity 0.3s;}
+body.driving .widget, body.force-show .widget, body.edit .widget{opacity:1;transition:opacity 0.2s;}
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <!-- Top: Gear + Speed + RPM numbers -->
+  <div class="top-row">
+    <div class="gear-box" id="gear-box">
+      <div class="gear-val" id="gear">N</div>
+    </div>
+    <div class="speed-block">
+      <div class="speed-val" id="speed">0</div>
+      <span class="speed-unit">km/h</span>
+      <span class="rpm-num" id="rpm-num">0 rpm</span>
+    </div>
+  </div>
+
+  <!-- RPM bar + shift LEDs -->
+  <div class="rpm-wrap">
+    <div class="rpm-bar" id="rpm-bar"><div class="rpm-fill" id="rpm-fill"></div></div>
+    <div class="sector-leds" id="leds">
+      <div class="s-led" id="l0"></div><div class="s-led" id="l1"></div>
+      <div class="s-led" id="l2"></div><div class="s-led" id="l3"></div>
+      <div class="s-led" id="l4"></div><div class="s-led" id="l5"></div>
+      <div class="s-led" id="l6"></div><div class="s-led" id="l7"></div>
+      <div class="s-led" id="l8"></div><div class="s-led" id="l9"></div>
+    </div>
+  </div>
+
+  <!-- Pedals -->
+  <div class="pedals-row">
+    <div class="pedal">
+      <div class="pedal-track"><div class="pedal-fill clt" id="c-fill"></div></div>
+      <div class="pedal-pct" id="c-pct">0</div>
+      <div class="pedal-label">Clt</div>
+    </div>
+    <div class="pedal">
+      <div class="pedal-track"><div class="pedal-fill brk" id="b-fill"></div></div>
+      <div class="pedal-pct" id="b-pct">0</div>
+      <div class="pedal-label">Brk</div>
+    </div>
+    <div class="pedal">
+      <div class="pedal-track"><div class="pedal-fill thr" id="t-fill"></div></div>
+      <div class="pedal-pct" id="t-pct">0</div>
+      <div class="pedal-label">Thr</div>
+    </div>
+  </div>
+
+  <!-- Steering -->
+  <div class="steer-row">
+    <div class="steer-deg" id="steer-l">0°</div>
+    <div class="steer-track">
+      <div class="steer-center"></div>
+      <div class="steer-dot" id="steer-dot" style="left:50%"></div>
+    </div>
+    <div class="steer-deg right" id="steer-r">0°</div>
+  </div>
+
+  <!-- Electronic Aids -->
+  <div class="aids-row">
+    <div class="aid-badge" id="aid-abs">
+      <div class="aid-lbl">ABS</div>
+      <div class="aid-val" id="abs-val">—</div>
+    </div>
+    <div class="aid-badge" id="aid-tc">
+      <div class="aid-lbl">TC</div>
+      <div class="aid-val" id="tc-val">—</div>
+    </div>
+    <div class="aid-badge" id="aid-mm">
+      <div class="aid-lbl">MAP</div>
+      <div class="aid-val" id="mm-val">—</div>
+    </div>
+  </div>
+
+  <!-- Engine Temps + Bias + Turbo -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-lbl">Water</div>
+      <div class="stat-val" id="water-temp" style="color:var(--green)">—°</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="water-bar" style="background:var(--green)"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-lbl">Oil</div>
+      <div class="stat-val" id="oil-temp" style="color:var(--green)">—°</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="oil-bar" style="background:var(--amber)"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-lbl">Bias R%</div>
+      <div class="stat-val" id="bias-val">—%</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bias-bar" style="background:var(--blue)"></div></div>
+    </div>
+  </div>
+
+  <!-- FFB -->
+  <div class="ffb-row">
+    <div class="ffb-lbl">FFB</div>
+    <div class="ffb-track"><div class="ffb-fill" id="ffb-fill"></div></div>
+  </div>
+
+  <!-- Lap invalidated warning -->
+  <div class="warn-strip" id="warn-inv">⚠ LAP INVALIDATED</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+if (window.electronAPI?.overlays?.onEditMode)
+  window.electronAPI.overlays.onEditMode(e => document.body.classList.toggle('edit', !!e));
+if (window.electronAPI?.overlays?.onForceShow)
+  window.electronAPI.overlays.onForceShow(on => document.body.classList.toggle('force-show', !!on));
+
+document.body.classList.add('not-driving');
+const $ = id => document.getElementById(id);
+const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+const fmt = v => v != null ? Math.round(v) : '—';
+
+// LED colours: green×4, amber×3, red×3
+const LED_COLORS = ['#1DB954','#1DB954','#1DB954','#1DB954','#FFB020','#FFB020','#FFB020','#FF4444','#FF4444','#FF4444'];
+
+function render(d) {
+  if (!d) return;
+
+  // Gear
+  const g = d.gear;
+  const gEl = $('gear'); const gBox = $('gear-box');
+  gEl.textContent = g == null ? '—' : (g < 0 ? 'R' : (g === 0 ? 'N' : String(g)));
+  gBox.className = 'gear-box' + (g === 0 ? ' neutral' : (g < 0 ? ' reverse' : ''));
+
+  // Speed + RPM
+  $('speed').textContent = fmt(d.speed);
+  const rpmVal = d.rpm ?? 0;
+  const rpmMax = d.rpm_max ?? d.max_rpm ?? 9000;
+  $('rpm-num').textContent = rpmVal ? Math.round(rpmVal).toLocaleString() + ' rpm' : '0 rpm';
+
+  const rpmPct = clamp((rpmVal / rpmMax) * 100, 0, 100);
+  $('rpm-fill').style.width = rpmPct + '%';
+  const flash = rpmPct >= 96;
+  $('rpm-bar').className = 'rpm-bar' + (flash ? ' flash' : '');
+
+  // Shift LEDs
+  for (let i = 0; i < 10; i++) {
+    const led = $('l'+i);
+    const on = rpmPct >= ((i + 1) * 9);
+    led.style.background = on ? LED_COLORS[i] : 'var(--border2)';
+    if (on && i >= 7) led.style.boxShadow = '0 0 4px ' + LED_COLORS[i];
+    else led.style.boxShadow = '';
+  }
+
+  // Pedals
+  const thr = clamp((d.throttle ?? 0) * (d.throttle > 1 ? 1 : 100), 0, 100);
+  const brk = clamp((d.brake   ?? 0) * (d.brake   > 1 ? 1 : 100), 0, 100);
+  const clt = clamp((d.clutch  ?? 0) * (d.clutch  > 1 ? 1 : 100), 0, 100);
+  $('t-fill').style.height = thr + '%'; $('t-pct').textContent = Math.round(thr);
+  $('b-fill').style.height = brk + '%'; $('b-pct').textContent = Math.round(brk);
+  $('c-fill').style.height = clt + '%'; $('c-pct').textContent = Math.round(clt);
+
+  // Steering
+  let st = d.steering ?? 0;
+  if (Math.abs(st) > 1.5) st = clamp(st / 180, -1, 1);
+  st = clamp(st, -1, 1);
+  $('steer-dot').style.left = (50 + st * 50) + '%';
+  const deg = Math.round(Math.abs(st) * 180);
+  $('steer-l').textContent = st < 0 ? deg + '°' : '0°';
+  $('steer-r').textContent = st > 0 ? deg + '°' : '0°';
+
+  // ABS
+  const absActive = d.abs_active === true || d.abs_active === 1;
+  const absLvl = d.abs ?? d.abs_setting;
+  const absMax = d.abs_max;
+  $('abs-val').textContent = absLvl != null ? (absMax ? absLvl+'/'+absMax : absLvl) : (absActive ? 'ON' : 'OFF');
+  $('aid-abs').className = 'aid-badge' + (absActive ? ' active-red' : '');
+
+  // TC
+  const tcActive = d.tc_active === true || d.tc_active === 1;
+  const tcLvl = d.tc ?? d.tc_setting;
+  const tcMax = d.tc_max;
+  $('tc-val').textContent = tcLvl != null ? (tcMax ? tcLvl+'/'+tcMax : tcLvl) : (tcActive ? 'ON' : 'OFF');
+  $('aid-tc').className = 'aid-badge' + (tcActive ? ' active' : '');
+
+  // Motor Map
+  const mm = d.motor_map ?? d.motor_map_setting;
+  const mmMax = d.motor_map_max;
+  $('mm-val').textContent = mm != null ? (mmMax ? mm+'/'+mmMax : mm) : '—';
+  $('aid-mm').className = 'aid-badge';
+
+  // Engine temps
+  const water = d.engine_water_temp;
+  if (water != null) {
+    $('water-temp').textContent = Math.round(water) + '°';
+    const wc = water > 110 ? 'var(--red)' : (water > 100 ? 'var(--amber)' : 'var(--green)');
+    $('water-temp').style.color = wc;
+    $('water-bar').style.background = wc;
+    $('water-bar').style.width = clamp((water / 120) * 100, 0, 100) + '%';
+  }
+  const oil = d.engine_oil_temp;
+  if (oil != null) {
+    $('oil-temp').textContent = Math.round(oil) + '°';
+    const oc = oil > 130 ? 'var(--red)' : (oil > 115 ? 'var(--amber)' : 'var(--green)');
+    $('oil-temp').style.color = oc;
+    $('oil-bar').style.background = oc;
+    $('oil-bar').style.width = clamp((oil / 140) * 100, 0, 100) + '%';
+  }
+
+  // Brake bias (rear%)
+  const bias = d.brake_bias ?? d.rear_brake_bias;
+  if (bias != null) {
+    const biasPct = bias > 1 ? bias : bias * 100;
+    $('bias-val').textContent = biasPct.toFixed(1) + '%';
+    $('bias-bar').style.width = clamp(biasPct, 0, 100) + '%';
+  }
+
+  // FFB
+  let ffb = d.ffb ?? 0;
+  if (Math.abs(ffb) <= 1.5) ffb = ffb * 100;
+  const ffbPct = clamp(Math.abs(ffb), 0, 100);
+  $('ffb-fill').style.width = ffbPct + '%';
+  $('ffb-fill').className = 'ffb-fill' + (ffbPct > 98 ? ' clip' : '');
+
+  // Lap invalidated warning
+  $('warn-inv').className = 'warn-strip' + ((d.lap_invalidated === true || d.lap_invalidated === 1) ? ' on' : '');
+}
+
+function applyDrivingGate(v) {
+  const driving = v === 1 || v === true || v === '1';
+  document.body.classList.toggle('driving', driving);
+  document.body.classList.toggle('not-driving', !driving);
+}
+
+const _isPreview = new URLSearchParams(location.search).get('preview') === '1';
+if (_isPreview) {
+  document.body.classList.add('force-show','driving');
+  render({ gear:3, speed:210, rpm:7200, rpm_max:9000, throttle:0.85, brake:0, clutch:0.02,
+    steering:-0.15, abs_active:false, abs:3, abs_max:8, tc_active:true, tc:2, tc_max:8,
+    motor_map:4, motor_map_max:8, engine_water_temp:88, engine_oil_temp:105,
+    brake_bias:0.54, ffb:62 });
+}
+
+let ws=null, rcT=null;
+function connect(){
+  try{ ws=new WebSocket((window.PITWALL && window.PITWALL.WS_URL) || 'ws://localhost:54345'); } catch(e){ sched(); return; }
+  ws.onclose=()=>sched();
+  ws.onerror=()=>{ try{ws.close();}catch(_){} };
+  ws.onmessage=(ev)=>{
+    let msg; try{msg=JSON.parse(ev.data);}catch(_){return;}
+    if(!msg?.type) return;
+    if(msg.type==='snapshot' && msg.data){ render(msg.data.driver); if(msg.data.session) applyDrivingGate(msg.data.session.is_driving); }
+    else if(msg.type==='update' && msg.topic==='driver') render(msg.data);
+    else if(msg.type==='update' && msg.topic==='session' && 'is_driving' in (msg.data||{})) applyDrivingGate(msg.data.is_driving);
+  };
+}
+function sched(){ if(!rcT) rcT=setTimeout(()=>{rcT=null;connect();},1500); }
+if(!_isPreview) connect();
+</script>
+</body>
+</html>

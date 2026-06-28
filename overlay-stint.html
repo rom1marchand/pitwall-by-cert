@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stint Overview</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  :root {
+    --lime:#C8FF00; --green:#1DB954; --amber:#FFB020; --red:#FF4444;
+    --blue:#3BA7FF; --purple:#B060FF;
+    --bg:rgba(7,7,7,0.93); --bg2:rgba(255,255,255,0.05); --bg3:rgba(255,255,255,0.08);
+    --muted:#5a5a5a; --muted2:#888; --border:#181818; --border2:#252525; --text:#e8e8e8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;width:100%;background:transparent;overflow:hidden;
+    font-family:'Barlow Condensed',sans-serif;user-select:none;color:var(--text);}
+
+  .widget{
+    position:absolute;inset:0;background:var(--bg);
+    backdrop-filter:blur(10px) saturate(1.8);
+    border-left:3px solid var(--lime);border-top:1px solid rgba(200,255,0,0.1);
+    border-radius:0 5px 5px 0;
+    box-shadow:0 8px 28px rgba(0,0,0,0.75),inset 1px 0 0 rgba(200,255,0,0.05);
+    padding:8px 11px;display:flex;flex-direction:column;
+    outline:2px dashed transparent;outline-offset:-4px;overflow:hidden;
+    font-variant-numeric:tabular-nums;
+  }
+  .widget::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:100;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);}
+
+  /* Header (title + breadcrumb + live dot) */
+  .hdr{display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-shrink:0;
+       font-size:10px;font-weight:900;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);}
+  .hdr .title{color:var(--lime);}
+  .dot{width:5px;height:5px;border-radius:50%;background:#2a2a2a;flex-shrink:0;
+       transition:background .2s,box-shadow .2s;}
+  .dot.live{background:var(--lime);box-shadow:0 0 7px rgba(200,255,0,0.8);}
+
+  /* Pages */
+  .pages{flex:1;min-height:0;position:relative;}
+  .page{display:flex;flex-direction:column;gap:6px;height:100%;}
+  .divider{height:1px;background:var(--border2);margin:1px 0;flex-shrink:0;}
+
+  /* Bar rows */
+  .bar-row{display:grid;grid-template-columns:60px 1fr auto;align-items:center;gap:6px 8px;}
+  .bar-label{font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;}
+  .bar{position:relative;height:10px;background:rgba(255,255,255,0.05);
+    border:1px solid var(--border2);border-radius:2px;overflow:hidden;}
+  .bar-fill{position:absolute;inset:0 100% 0 0;background:var(--lime);transition:right 0.15s linear,background 0.2s;}
+  .bar-meta{font-size:13px;font-weight:900;white-space:nowrap;}
+  .bar-sub{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);
+    padding:0 0 0 68px;margin-top:-3px;}
+
+  /* Tyre table */
+  .tyres-hint{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:9px;color:var(--muted);font-weight:900;letter-spacing:0.12em;text-transform:uppercase;}
+  table.tyres{width:100%;border-collapse:collapse;font-size:12px;}
+  table.tyres th,table.tyres td{padding:3px 3px;text-align:right;font-weight:700;}
+  table.tyres th{font-size:8px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;
+    border-bottom:1px solid var(--border2);}
+  table.tyres th:first-child,table.tyres td:first-child{text-align:left;color:var(--muted);
+    font-size:9px;letter-spacing:0.1em;text-transform:uppercase;}
+  table.tyres td{color:var(--text);}
+  .val.low{color:var(--red);} .val.mid{color:var(--amber);} .val.good{color:var(--lime);}
+  .val.muted{color:var(--muted);}
+
+  /* KV pairs */
+  .kv{display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-size:12px;}
+  .kv .k{color:var(--muted);font-weight:900;letter-spacing:0.08em;text-transform:uppercase;
+    font-size:9px;align-self:center;}
+  .kv .v{font-weight:900;text-align:right;}
+  .big{font-size:26px;font-weight:900;line-height:1;letter-spacing:-0.5px;}
+  .big.lime{color:var(--lime);} .big.amber{color:var(--amber);} .big.red{color:var(--red);}
+  .small-muted{color:var(--muted);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;}
+
+  body.edit .widget{outline-color:var(--lime);-webkit-app-region:drag;cursor:move;}
+  body.not-driving:not(.edit):not(.force-show) .widget{opacity:0;pointer-events:none;transition:opacity 0.3s;}
+  body.driving .widget, body.force-show .widget, body.edit .widget{opacity:1;transition:opacity 0.2s;}
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <span class="title" id="page-title">Tyres</span>
+    <span class="dot" id="dot"></span>
+  </div>
+
+  <div class="pages">
+    <!-- PAGE 0: TYRES @ 40/20 (default thresholds) -->
+    <div class="page" id="page-tyres-40-20">
+      <div class="tyres-hint">
+        <span>Projection → 40 / 20%</span>
+        <span id="avg-hint-a">avg —</span>
+      </div>
+      <table class="tyres">
+        <thead>
+          <tr><th></th><th>FL</th><th>FR</th><th>RL</th><th>RR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Now %</td>
+            <td id="a-w-FL">—</td><td id="a-w-FR">—</td><td id="a-w-RL">—</td><td id="a-w-RR">—</td></tr>
+          <tr><td>/lap</td>
+            <td id="a-r-FL">—</td><td id="a-r-FR">—</td><td id="a-r-RL">—</td><td id="a-r-RR">—</td></tr>
+          <tr><td>→ 40%</td>
+            <td id="a-hi-FL">—</td><td id="a-hi-FR">—</td><td id="a-hi-RL">—</td><td id="a-hi-RR">—</td></tr>
+          <tr><td>→ 20%</td>
+            <td id="a-lo-FL">—</td><td id="a-lo-FR">—</td><td id="a-lo-RL">—</td><td id="a-lo-RR">—</td></tr>
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="k">Compound</div><div class="v" id="a-compound">—</div>
+        <div class="k">Optimal T°</div><div class="v" id="a-optimal">—</div>
+      </div>
+    </div>
+
+    <!-- PAGE 1: TYRES @ 30/10 (tight thresholds for end-of-stint) -->
+    <div class="page" id="page-tyres-30-10" style="display:none">
+      <div class="tyres-hint">
+        <span>Projection → 30 / 10%</span>
+        <span id="avg-hint-b">avg —</span>
+      </div>
+      <table class="tyres">
+        <thead>
+          <tr><th></th><th>FL</th><th>FR</th><th>RL</th><th>RR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Now %</td>
+            <td id="b-w-FL">—</td><td id="b-w-FR">—</td><td id="b-w-RL">—</td><td id="b-w-RR">—</td></tr>
+          <tr><td>/lap</td>
+            <td id="b-r-FL">—</td><td id="b-r-FR">—</td><td id="b-r-RL">—</td><td id="b-r-RR">—</td></tr>
+          <tr><td>→ 30%</td>
+            <td id="b-hi-FL">—</td><td id="b-hi-FR">—</td><td id="b-hi-RL">—</td><td id="b-hi-RR">—</td></tr>
+          <tr><td>→ 10%</td>
+            <td id="b-lo-FL">—</td><td id="b-lo-FR">—</td><td id="b-lo-RL">—</td><td id="b-lo-RR">—</td></tr>
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="k">Compound</div><div class="v" id="b-compound">—</div>
+        <div class="k">Optimal T°</div><div class="v" id="b-optimal">—</div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: TYRES simple (no threshold projection) -->
+    <div class="page" id="page-tyres-simple" style="display:none">
+      <div class="tyres-hint">
+        <span>Wear &amp; rate only</span>
+        <span id="avg-hint-c">avg —</span>
+      </div>
+      <table class="tyres">
+        <thead>
+          <tr><th></th><th>FL</th><th>FR</th><th>RL</th><th>RR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Now %</td>
+            <td id="c-w-FL">—</td><td id="c-w-FR">—</td><td id="c-w-RL">—</td><td id="c-w-RR">—</td></tr>
+          <tr><td>/lap</td>
+            <td id="c-r-FL">—</td><td id="c-r-FR">—</td><td id="c-r-RL">—</td><td id="c-r-RR">—</td></tr>
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="k">Compound</div><div class="v" id="c-compound">—</div>
+        <div class="k">Optimal T°</div><div class="v" id="c-optimal">—</div>
+        <div class="k">Current Lap</div><div class="v" id="c-cur-lap">—</div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: FUEL & VE -->
+    <div class="page" id="page-fuel" style="display:none">
+      <div>
+        <div class="bar-row">
+          <div class="bar-label">Fuel</div>
+          <div class="bar"><div class="bar-fill" id="fuel-fill"></div></div>
+          <div class="bar-meta" id="fuel-meta">— L</div>
+        </div>
+        <div class="bar-sub">
+          <span id="fuel-left">—</span>
+          <span id="fuel-rate">—</span>
+        </div>
+      </div>
+
+      <div id="ve-block" style="display:none">
+        <div class="bar-row">
+          <div class="bar-label">VE</div>
+          <div class="bar"><div class="bar-fill" id="ve-fill" style="background:var(--blue)"></div></div>
+          <div class="bar-meta" id="ve-meta">—%</div>
+        </div>
+        <div class="bar-sub">
+          <span id="ve-left">—</span>
+          <span id="ve-rate">—</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="k">Tank Capacity</div><div class="v" id="tank-cap">—</div>
+        <div class="k">Current Lap</div><div class="v" id="cur-lap">—</div>
+        <div class="k">Position</div><div class="v" id="pos">—</div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: NEXT STINT -->
+    <div class="page" id="page-next" style="display:none">
+      <div>
+        <div class="small-muted">Pit in</div>
+        <div class="big lime" id="ns-laps">—</div>
+        <div class="small-muted" id="ns-reclap" style="margin-top:1px">—</div>
+      </div>
+
+      <div class="divider"></div>
+      <table class="tyres">
+        <thead>
+          <tr><th></th><th>FL</th><th>FR</th><th>RL</th><th>RR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>At pit</td>
+            <td id="at-FL">—</td><td id="at-FR">—</td><td id="at-RL">—</td><td id="at-RR">—</td></tr>
+          <tr><td>After</td>
+            <td id="nx-FL">—</td><td id="nx-FR">—</td><td id="nx-RL">—</td><td id="nx-RR">—</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:8px;color:var(--muted);padding-left:0" id="ns-at-hint">—</div>
+
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="k">Limiting</div><div class="v" id="ns-limit">—</div>
+        <div class="k">Tyre Reco</div><div class="v" id="ns-reco" style="color:var(--lime)">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  // ─── Local rolling-history state (for wear-rate averaging) ─────────────
+  const POS = ['FL','FR','RL','RR'];
+  const history = { samples: [], window: 5, lastLap: null };
+
+  // Format helpers (local + delegate to Overlay.fmt)
+  const fmtNum = (v, dp) => (v != null && !isNaN(v)) ? v.toFixed(dp) : '—';
+  const fmtInt = v => (v != null && !isNaN(v)) ? Math.round(v) : '—';
+  const fuelBarColor = p => p==null?'#333':(p<10?'var(--red)':(p<25?'var(--amber)':'var(--lime)'));
+  const wearClass = v => v==null?'muted':(v>60?'good':(v>30?'mid':'low'));
+  const lapsClass = v => v==null?'muted':(v>8?'good':(v>4?'mid':'low'));
+
+  function wearArr(d) {
+    const w=[d?.tyre_wear_fl,d?.tyre_wear_fr,d?.tyre_wear_rl,d?.tyre_wear_rr];
+    return w.some(v=>v==null)?null:w;
+  }
+
+  function maybeSnapshot() {
+    const d = Overlay.state.driver, s = Overlay.state.session;
+    if (!d || !s) return;
+    const lap = s.lap_number;
+    if (lap == null || lap === history.lastLap) return;
+    const wear = wearArr(d);
+    if (!wear) { history.lastLap = lap; return; }
+    history.samples.push({ lap, wear, fuel: s.fuel_liters ?? s.fuel_level, ve: d.virtual_energy });
+    while (history.samples.length > history.window + 1) history.samples.shift();
+    history.lastLap = lap;
+  }
+
+  function rolling() {
+    const h = history.samples;
+    if (h.length < 2) return null;
+    const first = h[0], last = h[h.length-1];
+    const dlap = last.lap - first.lap;
+    if (dlap <= 0) return null;
+    return {
+      wearRate: [0,1,2,3].map(i => (first.wear[i] - last.wear[i]) / dlap),
+      fuelRate: (first.fuel != null && last.fuel != null) ? (first.fuel - last.fuel) / dlap : null,
+      veRate:   (first.ve   != null && last.ve   != null) ? (first.ve   - last.ve  ) / dlap : null,
+      laps: dlap,
+    };
+  }
+
+  function setBar(el, pct, color) {
+    if (pct == null || isNaN(pct)) { el.style.right = '100%'; return; }
+    el.style.right = (100 - Math.max(0, Math.min(100, pct))) + '%';
+    if (color) el.style.background = color;
+  }
+
+  // ─── Tyre page renderer (parametrised by prefix + hi/lo thresholds) ────
+  function renderTyrePage(prefix, r, hi, lo) {
+    const d = Overlay.state.driver;
+    const wear = wearArr(d);
+    const avgEl = document.getElementById('avg-hint-' + prefix);
+    if (avgEl) avgEl.textContent = r ? `avg ${r.laps} lap${r.laps>1?'s':''}` : 'avg —';
+
+    POS.forEach((p, i) => {
+      const wv = wear ? wear[i] : null;
+      const rt = r ? r.wearRate[i] : null;
+      const $ = id => document.getElementById(id);
+
+      const wEl = $(prefix + '-w-' + p);
+      if (wEl) { wEl.textContent = wv != null ? fmtInt(wv) + '%' : '—'; wEl.className = 'val ' + wearClass(wv); }
+      const rEl = $(prefix + '-r-' + p);
+      if (rEl) { rEl.textContent = rt != null ? fmtNum(rt, 2) : '—'; rEl.className = 'val ' + (rt != null ? '' : 'muted'); }
+
+      if (hi != null) {
+        const toHi = (rt != null && wv != null && rt > 0) ? (wv - hi) / rt : null;
+        const hiEl = $(prefix + '-hi-' + p);
+        if (hiEl) {
+          hiEl.textContent = (toHi != null && toHi > 0) ? fmtNum(toHi, 1) : (wv != null && wv <= hi ? '0' : '—');
+          hiEl.className = 'val ' + lapsClass(toHi);
+        }
+      }
+      if (lo != null) {
+        const toLo = (rt != null && wv != null && rt > 0) ? (wv - lo) / rt : null;
+        const loEl = $(prefix + '-lo-' + p);
+        if (loEl) {
+          loEl.textContent = (toLo != null && toLo > 0) ? fmtNum(toLo, 1) : (wv != null && wv <= lo ? '0' : '—');
+          loEl.className = 'val ' + lapsClass(toLo);
+        }
+      }
+    });
+
+    // Compound / optimal
+    let cmp = '—';
+    if (d && d.tyre_compound_fl) {
+      const parts = [d.tyre_compound_fl, d.tyre_compound_fr, d.tyre_compound_rl, d.tyre_compound_rr];
+      cmp = (new Set(parts).size === 1) ? parts[0] : parts.join('/');
+    }
+    const cEl = document.getElementById(prefix + '-compound');
+    if (cEl) cEl.textContent = cmp;
+
+    let opt = '—';
+    if (d && d.tyre_optimal_fl != null) {
+      const parts = [d.tyre_optimal_fl, d.tyre_optimal_fr, d.tyre_optimal_rl, d.tyre_optimal_rr];
+      opt = fmtInt(parts.reduce((a,b)=>a+b,0)/4) + '°C';
+    }
+    const oEl = document.getElementById(prefix + '-optimal');
+    if (oEl) oEl.textContent = opt;
+
+    // Simple page extra: current lap
+    if (prefix === 'c') {
+      const s = Overlay.state.session;
+      const lEl = document.getElementById('c-cur-lap');
+      if (lEl) lEl.textContent = s && s.lap_number != null ? String(s.lap_number) : '—';
+    }
+  }
+
+  function renderFuel(r) {
+    const s = Overlay.state.session || {}, d = Overlay.state.driver || {}, st = Overlay.state.strategy || {};
+    const fuelPct = s.fuel_percent != null ? s.fuel_percent : null;
+    const fuelLiters = (s.fuel_liters ?? s.fuel_level) != null ? (s.fuel_liters ?? s.fuel_level) : null;
+    let fuelRate = (st.stint && st.stint.fuel_per_lap) || null;
+    if (!fuelRate && r && r.fuelRate) fuelRate = r.fuelRate;
+    const fuelLaps = (fuelRate && fuelLiters != null && fuelRate > 0) ? fuelLiters / fuelRate : null;
+
+    setBar(document.getElementById('fuel-fill'), fuelPct, fuelBarColor(fuelPct));
+    document.getElementById('fuel-meta').textContent =
+      (fuelLiters != null ? fmtNum(fuelLiters, 1) + ' L' : '— L') +
+      (fuelPct != null ? ' · ' + fmtInt(fuelPct) + '%' : '');
+    document.getElementById('fuel-left').textContent = fuelLaps != null ? fmtNum(fuelLaps, 1) + ' laps left' : '— laps';
+    document.getElementById('fuel-rate').textContent = fuelRate != null ? fmtNum(fuelRate, 2) + ' L/lap' : '— L/lap';
+
+    const ve = d.virtual_energy != null ? d.virtual_energy : null;
+    let veRate = (st.stint && st.stint.ve_per_lap) || null;
+    if (!veRate && r && r.veRate) veRate = r.veRate;
+    const veLaps = (veRate && ve != null && veRate > 0) ? ve / veRate : null;
+    const veBlock = document.getElementById('ve-block');
+    if (ve == null) veBlock.style.display = 'none';
+    else {
+      veBlock.style.display = '';
+      setBar(document.getElementById('ve-fill'), ve, 'var(--blue)');
+      document.getElementById('ve-meta').textContent = fmtInt(ve) + '%';
+      document.getElementById('ve-left').textContent = veLaps != null ? fmtNum(veLaps, 1) + ' laps left' : '— laps';
+      document.getElementById('ve-rate').textContent = veRate != null ? fmtNum(veRate, 2) + ' %/lap' : '— %/lap';
+    }
+
+    document.getElementById('tank-cap').textContent = s.fuel_capacity != null ? fmtNum(s.fuel_capacity, 0) + ' L' : '—';
+    document.getElementById('cur-lap').textContent = s.lap_number != null ? String(s.lap_number) : '—';
+    document.getElementById('pos').textContent = s.position != null ? ('P' + s.position + (s.num_vehicles ? '/' + s.num_vehicles : '')) : '—';
+  }
+
+  function renderNextStint(r) {
+    const st = Overlay.state.strategy || {}, d = Overlay.state.driver || {};
+    const wear = wearArr(d);
+    const lapsToPit = st.stint ? st.stint.laps_until_pit : null;
+    const limit     = st.stint ? st.stint.limiting_factor : null;
+    const recLap    = st.race_plan ? st.race_plan.recommended_pit_lap : null;
+    const reco      = st.tyres ? st.tyres.recommendation : null;
+    const reason    = st.tyres ? st.tyres.reason : null;
+
+    const nsLapsEl = document.getElementById('ns-laps');
+    nsLapsEl.textContent = (lapsToPit != null && isFinite(lapsToPit)) ? lapsToPit : '—';
+    nsLapsEl.className = 'big ' + (lapsToPit != null && lapsToPit <= 2 ? 'red' : (lapsToPit != null && lapsToPit <= 5 ? 'amber' : 'lime'));
+    document.getElementById('ns-limit').textContent = limit || '—';
+    document.getElementById('ns-reclap').textContent = (recLap != null && recLap > 0) ? ('→ lap ' + recLap) : '—';
+
+    if (wear && r && lapsToPit != null && isFinite(lapsToPit)) {
+      const atPit = wear.map((w,i) => Math.max(0, w - r.wearRate[i] * lapsToPit));
+      const next  = atPit.map((w,i) => Math.max(0, w - r.wearRate[i] * lapsToPit));
+      POS.forEach((p,i) => {
+        const atEl = document.getElementById('at-' + p), nxEl = document.getElementById('nx-' + p);
+        atEl.textContent = fmtInt(atPit[i]) + '%'; atEl.className = 'val ' + wearClass(atPit[i]);
+        nxEl.textContent = fmtInt(next[i])  + '%'; nxEl.className = 'val ' + wearClass(next[i]);
+      });
+      document.getElementById('ns-at-hint').textContent = `in ${lapsToPit} lap${lapsToPit>1?'s':''}`;
+    } else {
+      POS.forEach(p => {
+        document.getElementById('at-' + p).textContent = '—';
+        document.getElementById('nx-' + p).textContent = '—';
+      });
+      document.getElementById('ns-at-hint').textContent = '—';
+    }
+    document.getElementById('ns-reco').textContent = reco ? (reason ? `${reco} — ${reason}` : reco) : '—';
+  }
+
+  // ─── Pages registration ────────────────────────────────────────────────
+  Overlay.registerPages([
+    {
+      id: 'tyres-40-20', label: 'Tyres',
+      el: '#page-tyres-40-20',
+      onEnter() { document.getElementById('page-title').textContent = 'Tyres · 40/20'; },
+    },
+    {
+      id: 'tyres-30-10', label: 'Tyres tight',
+      el: '#page-tyres-30-10',
+      onEnter() { document.getElementById('page-title').textContent = 'Tyres · 30/10'; },
+    },
+    {
+      id: 'tyres-simple', label: 'Tyres simple',
+      el: '#page-tyres-simple',
+      onEnter() { document.getElementById('page-title').textContent = 'Tyres · simple'; },
+    },
+    {
+      id: 'fuel', label: 'Fuel · VE',
+      el: '#page-fuel',
+      onEnter() { document.getElementById('page-title').textContent = 'Fuel · VE'; },
+    },
+    {
+      id: 'next', label: 'Next Stint',
+      el: '#page-next',
+      onEnter() { document.getElementById('page-title').textContent = 'Next Stint'; },
+    },
+  ]);
+
+  // ─── Master render dispatcher (re-renders all pages; cheap enough) ─────
+  function render() {
+    maybeSnapshot();
+    const r = rolling();
+    renderTyrePage('a', r, 40, 20);
+    renderTyrePage('b', r, 30, 10);
+    renderTyrePage('c', r, null, null);
+    renderFuel(r);
+    renderNextStint(r);
+  }
+
+  Overlay.init({
+    liveDot: document.getElementById('dot'),
+    onData: render,
+  });
+  // Periodic redraw even without new data (so projection stays fresh)
+  setInterval(render, 500);
+</script>
+</body>
+</html>

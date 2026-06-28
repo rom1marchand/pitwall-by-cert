@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setups — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<style>
+.su-layout { display: grid; grid-template-columns: 260px 1fr; height: calc(100vh - 48px); }
+.su-sidebar { border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.su-main { overflow-y: auto; padding: 20px; }
+
+.setup-item { padding: 12px 14px; cursor: pointer; border-left: 3px solid var(--border);
+  transition: border-color .15s, background .15s; }
+.setup-item:hover { border-left-color: var(--lime); background: #1a1a0f; }
+.setup-item.active { border-left-color: var(--lime); background: rgba(200,255,0,.05); }
+.setup-item-name { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+.setup-item-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.btn-new { background: transparent; border: 1px dashed var(--border); color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; padding: 10px;
+  border-radius: 2px; cursor: pointer; width: 100%; transition: border-color .15s, color .15s; }
+.btn-new:hover { border-color: var(--lime); color: var(--lime); }
+
+/* Setup editor */
+.setup-editor { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--lime);
+  margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+.param-row { display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,.4); }
+.param-name { font-size: 12px; color: var(--muted); }
+.param-val  { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; }
+.param-unit { font-size: 10px; color: var(--muted); margin-left: 3px; }
+
+/* Compare */
+.compare-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+.compare-tag { padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 700;
+  font-family: 'Barlow Condensed', sans-serif; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.diff-better { color: var(--lime); }
+.diff-worse  { color: var(--red); }
+.diff-same   { color: var(--muted); }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="su-layout">
+
+  <!-- Sidebar -->
+  <div class="su-sidebar">
+    <div class="section-label">Setups</div>
+    <div id="setup-list"></div>
+    <button class="btn-new" onclick="newSetup()">+ New Setup</button>
+  </div>
+
+  <!-- Main -->
+  <div class="su-main" id="su-main">
+    <div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase">
+      Select or create a setup
+    </div>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+renderHeader('lineup', 'setups')
+if (_checkPopoutOverlay('setups')) throw ''
+
+// ── STORAGE ──
+const STORAGE_KEY = 'pw_setups'
+let setups  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+let current = null
+
+const DEFAULT_SETUP = {
+  suspension: {
+    'Front ARB':         { val: 4,     unit: ''    },
+    'Rear ARB':          { val: 3,     unit: ''    },
+    'Front Spring':      { val: 145,   unit: 'N/mm'},
+    'Rear Spring':       { val: 130,   unit: 'N/mm'},
+    'Front Ride Height': { val: 62,    unit: 'mm'  },
+    'Rear Ride Height':  { val: 74,    unit: 'mm'  },
+    'Front Bump':        { val: 8,     unit: ''    },
+    'Rear Bump':         { val: 7,     unit: ''    },
+  },
+  aero: {
+    'Front Wing':        { val: 5,     unit: ''    },
+    'Rear Wing':         { val: 7,     unit: ''    },
+    'Brake Duct Front':  { val: 3,     unit: ''    },
+    'Brake Duct Rear':   { val: 2,     unit: ''    },
+  },
+  tyres: {
+    'FL Pressure':       { val: 127.4, unit: 'kPa' },
+    'FR Pressure':       { val: 127.5, unit: 'kPa' },
+    'RL Pressure':       { val: 127.8, unit: 'kPa' },
+    'RR Pressure':       { val: 127.9, unit: 'kPa' },
+    'Tyre Compound':     { val: 'Medium', unit: '' },
+  },
+  drivetrain: {
+    'Brake Bias':        { val: 53.5,  unit: '%'   },
+    'Engine Map':        { val: 2,     unit: ''    },
+    'TC Level':          { val: 4,     unit: ''    },
+    'ABS Level':         { val: 3,     unit: ''    },
+    'Regen Level':       { val: 5,     unit: ''    },
+  },
+}
+
+// ── RENDER SIDEBAR ──
+function renderList() {
+  const el = document.getElementById('setup-list')
+  if (!setups.length) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:8px 0">No setups yet.</div>`
+    return
+  }
+  el.innerHTML = setups.map((s,i) => `
+    <div class="card setup-item${current?.id === s.id ? ' active' : ''}" onclick="loadSetup(${i})">
+      <div class="setup-item-name">${esc(s.name)}</div>
+      <div class="setup-item-meta">${esc(s.track||'—')} · ${new Date(s.updated).toLocaleDateString()}</div>
+    </div>`).join('')
+}
+
+// ── LOAD SETUP ──
+function loadSetup(idx) {
+  current = setups[idx]
+  renderList()
+  renderEditor()
+}
+
+// ── EDITOR ──
+function renderEditor() {
+  if (!current) return
+  const s = current.data
+
+  const SECTION_LABELS = {
+    suspension: 'Suspension', aero: 'Aerodynamics',
+    tyres: 'Tyres & Pressures', drivetrain: 'Drivetrain & Electronics'
+  }
+
+  const sectionsHTML = Object.entries(s).map(([key, params]) => `
+    <div class="setup-section">
+      <div class="section-title">${SECTION_LABELS[key] || key}</div>
+      ${Object.entries(params).map(([name, p]) => `
+        <div class="param-row">
+          <div class="param-name">${esc(name)}</div>
+          <div>
+            <span class="param-val" contenteditable="true"
+              onblur="updateParam('${key}','${name}',this.textContent)"
+              style="outline:none;cursor:text">${esc(String(p.val))}</span>
+            ${p.unit ? `<span class="param-unit">${esc(p.unit)}</span>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('')
+
+  document.getElementById('su-main').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase"
+          contenteditable="true" onblur="renameSetup(this.textContent)">${esc(current.name)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">
+          <input type="text" value="${esc(current.track||'')}" placeholder="Track name"
+            onchange="current.track=this.value;save()"
+            style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;width:160px;padding:2px 0;outline:none">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div id="svm-spinner" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--lime);margin-right:4px">
+          <div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0"></div>
+        </div>
+        <input type="file" id="svm-file-input" accept=".svm" style="display:none" onchange="handleImportSvm(event)">
+        <button class="btn-secondary svm-btn" style="width:auto;padding:7px 14px" onclick="document.getElementById('svm-file-input').click()">Import SVM</button>
+        <button class="btn-secondary svm-btn" style="width:auto;padding:7px 14px" onclick="exportSetupSvm()">Export SVM</button>
+        <button class="btn-secondary" style="width:auto;padding:7px 14px" onclick="duplicateSetup()">Duplicate</button>
+        <button class="btn-secondary" style="width:auto;padding:7px 14px;border-color:var(--red);color:var(--red)" onclick="deleteSetup()">Delete</button>
+      </div>
+    </div>
+    <div class="setup-editor">${sectionsHTML}</div>`
+}
+
+function updateParam(section, name, val) {
+  if (!current) return
+  const num = parseFloat(val)
+  current.data[section][name].val = isNaN(num) ? val : num
+  save()
+}
+
+function renameSetup(name) {
+  if (!current || !name.trim()) return
+  current.name = name.trim()
+  save()
+  renderList()
+}
+
+function newSetup() {
+  const s = {
+    id:      Date.now(),
+    name:    `Setup ${setups.length + 1}`,
+    track:   '',
+    updated: Date.now(),
+    data:    JSON.parse(JSON.stringify(DEFAULT_SETUP)),
+  }
+  setups.push(s)
+  save()
+  loadSetup(setups.length - 1)
+  renderList()
+}
+
+function duplicateSetup() {
+  if (!current) return
+  const s = { ...JSON.parse(JSON.stringify(current)), id: Date.now(), name: current.name + ' (copy)', updated: Date.now() }
+  setups.push(s)
+  save()
+  loadSetup(setups.length - 1)
+  renderList()
+}
+
+function deleteSetup() {
+  if (!current) return
+  if (!confirm(`Delete "${current.name}"?`)) return
+  setups = setups.filter(s => s.id !== current.id)
+  current = null
+  save()
+  renderList()
+  document.getElementById('su-main').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase">Select or create a setup</div>`
+}
+
+function save() {
+  if (current) current.updated = Date.now()
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(setups))
+}
+
+function toggleSvmSpinner(show) {
+  const spinner = document.getElementById('svm-spinner');
+  if (spinner) spinner.style.display = show ? 'flex' : 'none';
+  document.querySelectorAll('.svm-btn').forEach(btn => btn.disabled = show);
+}
+
+async function exportSetupSvm() {
+  if (!current) return;
+  toggleSvmSpinner(true);
+  try {
+    let svmText = '';
+    const raw = current.raw_svm || {
+      BASIC: { Downforce: 0.500000, Balance: 0.500000, Ride: 0.500000, Gearing: 0.500000, Custom: 1 },
+      FRONTLEFT: {}, FRONTRIGHT: {}, REARLEFT: {}, REARRIGHT: {}
+    };
+
+    // Overlay the UI edits
+    if (current.data.tyres) {
+      if (!raw.FRONTLEFT) raw.FRONTLEFT = {};
+      if (!raw.FRONTRIGHT) raw.FRONTRIGHT = {};
+      if (!raw.REARLEFT) raw.REARLEFT = {};
+      if (!raw.REARRIGHT) raw.REARRIGHT = {};
+
+      raw.FRONTLEFT.PressureSetting = current.data.tyres['FL Pressure'].val;
+      raw.FRONTLEFT.CompoundSetting = current.data.tyres['Tyre Compound'].val;
+      raw.FRONTRIGHT.PressureSetting = current.data.tyres['FR Pressure'].val;
+      raw.REARLEFT.PressureSetting = current.data.tyres['RL Pressure'].val;
+      raw.REARRIGHT.PressureSetting = current.data.tyres['RR Pressure'].val;
+    }
+
+    // Format as an INI/SVM string
+    for (const [section, params] of Object.entries(raw)) {
+      svmText += `[${section}]\n`;
+      for (const [k, v] of Object.entries(params)) {
+        if (typeof v === 'object' && v !== null) continue; // Skip nested objects just in case
+        if (k.endsWith('Setting')) {
+            // Reconstruct the 0// format expected by the game
+            svmText += `${k}=0//${v}\n`;
+        } else {
+            svmText += `${k}=${v}\n`;
+        }
+      }
+      svmText += '\n';
+    }
+
+    const blob = new Blob([svmText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (current.name || 'setup') + '.svm';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error(e);
+    alert('Erreur lors de l\'exportation du setup SVM');
+  } finally {
+    toggleSvmSpinner(false);
+  }
+}
+
+function handleImportSvm(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  toggleSvmSpinner(true);
+  
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const svmContent = e.target.result;
+    try {
+      const res = await fetch('http://localhost:5000/api/stint-plan/parse-svm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ svmContent })
+      });
+      if (!res.ok) throw new Error('Import failed');
+      const parsed = await res.json();
+      
+      // Map parsed values to the editor's UI if they exist
+      if (parsed.FRONTLEFT) {
+          if (parsed.FRONTLEFT.PressureSetting) current.data.tyres['FL Pressure'].val = parsed.FRONTLEFT.PressureSetting;
+          if (parsed.FRONTLEFT.CompoundSetting) current.data.tyres['Tyre Compound'].val = parsed.FRONTLEFT.CompoundSetting;
+      }
+      if (parsed.FRONTRIGHT && parsed.FRONTRIGHT.PressureSetting) current.data.tyres['FR Pressure'].val = parsed.FRONTRIGHT.PressureSetting;
+      if (parsed.REARLEFT && parsed.REARLEFT.PressureSetting) current.data.tyres['RL Pressure'].val = parsed.REARLEFT.PressureSetting;
+      if (parsed.REARRIGHT && parsed.REARRIGHT.PressureSetting) current.data.tyres['RR Pressure'].val = parsed.REARRIGHT.PressureSetting;
+      
+      // Store the raw parsed SVM for exporting later
+      current.raw_svm = parsed;
+      
+      save();
+      renderEditor();
+      renderList();
+      alert('Setup SVM importé avec succès !');
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de l\'importation du setup SVM');
+      toggleSvmSpinner(false);
+    }
+  };
+  reader.onerror = () => {
+    console.error("FileReader error");
+    alert('Erreur lors de la lecture du fichier SVM');
+    toggleSvmSpinner(false);
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+renderList()
+</script>
+</body>
+</html>

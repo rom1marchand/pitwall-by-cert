@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Weather & Track</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="overlay-common.css">
+<style>
+  /* Temperature boxes */
+  .temp-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:6px;
+  }
+  .temp-box {
+    background:var(--bg2); border:1px solid var(--border2); border-radius:3px; padding:5px 8px;
+  }
+  .temp-box .t-lbl { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .temp-box .t-val { font-size:24px; font-weight:900; line-height:1.1; font-variant-numeric:tabular-nums; }
+  .temp-box .t-unit { font-size:11px; color:var(--muted); margin-left:1px; }
+
+  /* Sky condition */
+  .sky-box {
+    background:var(--bg2); border:1px solid var(--border2); border-radius:3px;
+    padding:5px 8px; margin-bottom:5px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .sky-icon { font-size:22px; line-height:1; }
+  .sky-info { flex:1; }
+  .sky-name { font-size:11px; font-weight:900; color:#e8e8e8; }
+  .sky-sub  { font-size:9px; color:var(--muted); font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+
+  /* Data rows */
+  .data-grid {
+    display:grid; grid-template-columns:auto 1fr auto; gap:3px 8px; align-items:center;
+    font-size:12px; margin-bottom:5px;
+  }
+  .d-lbl { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .d-bar  { height:4px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden; }
+  .d-fill { height:100%; transition:width 0.2s; }
+  .d-val  { font-size:11px; font-weight:900; text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* Wind */
+  .wind-row { display:flex; align-items:center; gap:6px; }
+  .wind-lbl { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); min-width:30px; }
+  .wind-arrow { font-size:16px; line-height:1; transition:transform 0.3s; }
+  .wind-val { font-size:12px; font-weight:900; font-variant-numeric:tabular-nums; }
+
+  /* Page wrapper for multi-page switching */
+  .page { display:flex; flex-direction:column; gap:0; flex:1; min-height:0; }
+
+  /* ─── Page 2: Wets recommendation ──────────────────────────────────────── */
+  .verdict {
+    padding:10px; border-radius:4px; margin-bottom:8px;
+    border-left:4px solid var(--muted2);
+    background:var(--bg2);
+  }
+  .verdict.go-wets   { border-left-color:var(--blue); background:rgba(59,167,255,0.12); }
+  .verdict.stay-slicks { border-left-color:var(--lime); background:rgba(200,255,0,0.08); }
+  .verdict.uncertain { border-left-color:var(--amber); background:rgba(255,176,32,0.08); }
+  .verdict .v-big {
+    font-size:18px; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; line-height:1.1;
+  }
+  .verdict .v-sub {
+    font-size:10px; color:var(--muted); font-weight:700; letter-spacing:0.12em;
+    text-transform:uppercase; margin-top:3px;
+  }
+  .rec-metric {
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:3px 0; border-bottom:1px dashed var(--border2);
+  }
+  .rec-metric:last-child { border-bottom:0; }
+  .rec-metric .m-k { font-size:9px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  .rec-metric .m-v { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .threshold-note {
+    font-size:9px; color:var(--muted); font-weight:700; letter-spacing:0.1em;
+    text-transform:uppercase; margin-top:6px; text-align:center;
+  }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Weather &amp; Track</div>
+    <div class="dot" id="dot"></div>
+  </div>
+
+  <!-- ═══ Page 1 : Current conditions ═══════════════════════════════════ -->
+  <div class="page" id="page-main">
+    <!-- Temps -->
+    <div class="temp-grid">
+      <div class="temp-box">
+        <div class="t-lbl">Air</div>
+        <div class="t-val"><span id="air">—</span><span class="t-unit">°C</span></div>
+      </div>
+      <div class="temp-box">
+        <div class="t-lbl">Track</div>
+        <div class="t-val"><span id="track">—</span><span class="t-unit">°C</span></div>
+      </div>
+    </div>
+
+    <!-- Sky condition -->
+    <div class="sky-box">
+      <div class="sky-icon" id="sky-icon">☀️</div>
+      <div class="sky-info">
+        <div class="sky-name" id="sky-name">Clear</div>
+        <div class="sky-sub" id="sky-sub">SKY CONDITION</div>
+      </div>
+    </div>
+
+    <!-- Rain + Wetness + Cloud -->
+    <div class="data-grid">
+      <div class="d-lbl">Rain</div>
+      <div class="d-bar"><div class="d-fill" id="rain-fill" style="background:var(--blue)"></div></div>
+      <div class="d-val" id="rain-pct">—%</div>
+
+      <div class="d-lbl">Wetness</div>
+      <div class="d-bar"><div class="d-fill" id="wet-fill" style="background:var(--blue)"></div></div>
+      <div class="d-val" id="wet-pct">—%</div>
+
+      <div class="d-lbl">Cloud</div>
+      <div class="d-bar"><div class="d-fill" id="cloud-fill" style="background:var(--muted)"></div></div>
+      <div class="d-val" id="cloud-pct">—%</div>
+    </div>
+
+    <!-- Wind -->
+    <div class="wind-row">
+      <div class="wind-lbl">Wind</div>
+      <div class="wind-arrow" id="wind-arrow">→</div>
+      <div class="wind-val" id="wind-val">— m/s</div>
+    </div>
+  </div>
+
+  <!-- ═══ Page 2 : Wets recommendation ══════════════════════════════════ -->
+  <div class="page" id="page-wets" style="display:none">
+    <div class="verdict" id="verdict">
+      <div class="v-big" id="verdict-big">—</div>
+      <div class="v-sub" id="verdict-sub">ANALYZING CONDITIONS</div>
+    </div>
+    <div class="rec-metric"><span class="m-k">Wetness</span><span class="m-v" id="rec-wet">—%</span></div>
+    <div class="rec-metric"><span class="m-k">Rain</span>   <span class="m-v" id="rec-rain">—%</span></div>
+    <div class="rec-metric"><span class="m-k">Air Temp</span><span class="m-v" id="rec-air">—°C</span></div>
+    <div class="rec-metric"><span class="m-k">Track Temp</span><span class="m-v" id="rec-track">—°C</span></div>
+    <div class="threshold-note">SWITCH TO WETS WHEN WETNESS &gt; 15%</div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="overlay-common.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+
+  const WETNESS_THRESHOLD_PCT = 15;   // above this → recommend wets
+
+  const SKY_CONDITIONS = [
+    ['☀️', 'Clear',                 'CLEAR SKIES'],
+    ['🌤️', 'Light Clouds',         'PARTLY SUNNY'],
+    ['⛅', 'Partly Cloudy',        'MIXED CONDITIONS'],
+    ['🌥️', 'Mostly Cloudy',        'OVERCAST BUILDING'],
+    ['☁️', 'Overcast',             'FULL OVERCAST'],
+    ['🌦️', 'Cloudy & Drizzle',    'LIGHT MOISTURE'],
+    ['🌧️', 'Light Rain',           'LIGHT RAIN'],
+    ['🌧️', 'Overcast Light Rain', 'RAIN LIKELY'],
+    ['🌧️', 'Rain',                 'WET TRACK'],
+    ['⛈️', 'Heavy Rain',           'HEAVY RAIN'],
+    ['⛈️', 'Storm',                'STORM CONDITIONS'],
+  ];
+
+  const WIND_ARROWS = ['↑','↗','→','↘','↓','↙','←','↖'];
+
+  function updateRecommendation(se, wetPct, rainPct) {
+    const v   = $('verdict');
+    const big = $('verdict-big');
+    const sub = $('verdict-sub');
+    v.classList.remove('go-wets', 'stay-slicks', 'uncertain');
+
+    const wet = wetPct ?? 0;
+    const rain = rainPct ?? 0;
+
+    if (wet == null && rain == null) {
+      big.textContent = 'NO DATA';
+      sub.textContent = 'AWAITING TELEMETRY';
+      v.classList.add('uncertain');
+      return;
+    }
+
+    if (wet > WETNESS_THRESHOLD_PCT) {
+      big.textContent = '🌧  SWITCH TO WETS';
+      sub.textContent = `WETNESS ${Math.round(wet)}% — ABOVE THRESHOLD`;
+      v.classList.add('go-wets');
+    } else if (wet > WETNESS_THRESHOLD_PCT * 0.6 || rain > 10) {
+      big.textContent = '⚠  MONITOR CONDITIONS';
+      sub.textContent = `WETNESS CLIMBING — ${Math.round(wet)}%`;
+      v.classList.add('uncertain');
+    } else {
+      big.textContent = '✓  STAY ON SLICKS';
+      sub.textContent = `DRY — WETNESS ${Math.round(wet)}%`;
+      v.classList.add('stay-slicks');
+    }
+  }
+
+  Overlay.registerPages([
+    { id: 'main', label: 'Main',   el: '#page-main' },
+    { id: 'wets', label: 'Wets',   el: '#page-wets' },
+  ]);
+
+  Overlay.init({
+    liveDot: $('dot'),
+    onData: (s) => {
+      const se = s.session || {};
+
+      // Temps (shared across both pages)
+      const airT   = se.air_temp ?? se.ambient_temp;
+      const trackT = se.track_temp;
+      $('air').textContent   = airT   != null ? Math.round(airT)   : '—';
+      $('track').textContent = trackT != null ? Math.round(trackT) : '—';
+
+      // Sky condition
+      const sky = se.sky_type ?? se.cloud_coverage;
+      const [icon, name, sub] = SKY_CONDITIONS[Math.min(sky ?? 0, 10)] ?? SKY_CONDITIONS[0];
+      $('sky-icon').textContent = icon;
+      $('sky-name').textContent = name;
+      $('sky-sub').textContent = sub;
+
+      // Rain
+      const rain = se.rain ?? se.rain_intensity ?? se.raining;
+      const rainPct = rain != null ? clamp(rain > 1 ? rain : rain * 100, 0, 100) : null;
+      $('rain-pct').textContent = rainPct != null ? Math.round(rainPct) + '%' : '—%';
+      $('rain-fill').style.width = (rainPct ?? 0) + '%';
+
+      // Wetness
+      const wet = se.track_wetness ?? se.wetness ?? se.avg_path_wetness;
+      const wetPct = wet != null ? clamp(wet > 1 ? wet : wet * 100, 0, 100) : null;
+      $('wet-pct').textContent = wetPct != null ? Math.round(wetPct) + '%' : '—%';
+      $('wet-fill').style.width = (wetPct ?? 0) + '%';
+
+      // Cloud
+      const cloud = se.cloud_cover ?? (se.dark_cloud != null ? se.dark_cloud * 100 : null);
+      const cloudPct = cloud != null ? clamp(cloud > 1 ? cloud : cloud * 100, 0, 100) : null;
+      $('cloud-pct').textContent = cloudPct != null ? Math.round(cloudPct) + '%' : '—%';
+      $('cloud-fill').style.width = (cloudPct ?? 0) + '%';
+
+      // Wind
+      const ws = se.wind_speed, wd = se.wind_dir;
+      if (ws != null && isFinite(ws)) {
+        $('wind-val').textContent = ws.toFixed(1) + ' m/s' + (wd != null ? ' · ' + Math.round(wd) + '°' : '');
+        if (wd != null) {
+          const arrowIdx = Math.round(wd / 45) % 8;
+          $('wind-arrow').textContent = WIND_ARROWS[arrowIdx];
+        }
+      } else {
+        $('wind-val').textContent = '— m/s';
+      }
+
+      // Page 2 — recommendation mirror
+      $('rec-wet').textContent   = wetPct   != null ? Math.round(wetPct)  + '%' : '—%';
+      $('rec-rain').textContent  = rainPct  != null ? Math.round(rainPct) + '%' : '—%';
+      $('rec-air').textContent   = airT     != null ? Math.round(airT)    + '°C' : '—°C';
+      $('rec-track').textContent = trackT   != null ? Math.round(trackT)  + '°C' : '—°C';
+      updateRecommendation(se, wetPct, rainPct);
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+{
+  "widgets": [
+    {
+      "id": "delta",
+      "type": "overlay-delta",
+      "enabled": true,
+      "displayIndex": 1,
+      "x": 1099,
+      "y": 99,
+      "w": 287,
+      "h": 141,
+      "ratio": 2.03
+    },
+    {
+      "id": "tyres",
+      "type": "overlay-tyres",
+      "enabled": false,
+      "displayIndex": 1,
+      "x": 2202,
+      "y": 304,
+      "w": 280,
+      "h": 240,
+      "ratio": 1.17
+    },
+    {
+      "id": "stint",
+      "type": "overlay-stint",
+      "enabled": true,
+      "displayIndex": 1,
+      "x": 2227,
+      "y": 467,
+      "w": 302,
+      "h": 211,
+      "ratio": 1.43
+    },
+    {
+      "id": "laps",
+      "type": "overlay-laps",
+      "enabled": false,
+      "displayIndex": 2,
+      "x": 706,
+      "y": 137,
+      "w": 260,
+      "h": 160,
+      "ratio": 1.625
+    },
+    {
+      "id": "fuel",
+      "type": "overlay-fuel",
+      "enabled": false,
+      "displayIndex": 1,
+      "x": 592,
+      "y": 880,
+      "w": 230,
+      "h": 168,
+      "ratio": 1.37
+    },
+    {
+      "id": "pit",
+      "type": "overlay-pit",
+      "enabled": false,
+      "displayIndex": 1,
+      "x": 56,
+      "y": 447,
+      "w": 313,
+      "h": 265,
+      "ratio": 1.18
+    },
+    {
+      "id": "inputs",
+      "type": "overlay-inputs",
+      "enabled": false,
+      "displayIndex": 1,
+      "x": 2207,
+      "y": 588,
+      "w": 280,
+      "h": 233,
+      "ratio": 1.2
+    },
+    {
+      "id": "gaps",
+      "type": "overlay-gaps",
+      "enabled": false,
+      "displayIndex": 1,
+      "x": 1711,
+      "y": 814,
+      "w": 280,
+      "h": 230,
+      "ratio": 1.22
+    },
+    {
+      "id": "weather",
+      "type": "overlay-weather",
+      "enabled": true,
+      "displayIndex": 1,
+      "x": 2262,
+      "y": 38,
+      "w": 279,
+      "h": 199,
+      "ratio": 1.4
+    },
+    {
+      "id": "flag",
+      "type": "overlay-flag",
+      "enabled": true,
+      "displayIndex": 1,
+      "x": 35,
+      "y": 6,
+      "w": 320,
+      "h": 120,
+      "ratio": 2.67
+    },
+    {
+      "id": "engineer",
+      "type": "overlay-engineer",
+      "displayIndex": 1,
+      "x": 32,
+      "y": 358,
+      "w": 320,
+      "h": 140,
+      "enabled": true
+    },
+    {
+      "id": "standings",
+      "type": "overlay-standings",
+      "enabled": true,
+      "displayIndex": 1,
+      "x": 54,
+      "y": 545,
+      "w": 320,
+      "h": 240,
+      "ratio": 1.33
+    }
+  ]
+}

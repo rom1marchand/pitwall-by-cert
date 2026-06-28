@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Map — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<script src="telemetry-3d.js"></script>
+<style>
+.tm-layout { display: grid; grid-template-columns: 1fr 300px; height: calc(100vh - 48px); }
+.tm-map-area { position: relative; overflow: hidden; background: #0d0d0d; }
+canvas#track-canvas { width: 100%; height: 100%; display: block; }
+
+/* Tooltip */
+.car-tooltip {
+  display: none; position: absolute; z-index: 50; pointer-events: none;
+  background: rgba(20,20,20,.95); border: 1px solid var(--border); border-radius: 4px;
+  padding: 8px 11px; min-width: 140px;
+  font-family: 'Barlow',sans-serif; font-size: 12px; color: var(--text);
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+.car-tooltip .tt-name { font-family: 'Barlow Condensed',sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.car-tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; color: #aaa; font-size: 11px; line-height: 1.6; }
+.car-tooltip .tt-val { color: var(--text); font-weight: 600; }
+
+.tm-sidebar { border-left: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Weather card */
+.weather-card { padding: 14px; }
+.weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.w-item { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 8px 10px; }
+.w-item.wide { grid-column: 1/-1; }
+.w-key  { font-size: 8px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); }
+.w-val  { font-family: 'Barlow Condensed',sans-serif; font-size: 18px; font-weight: 700; }
+
+/* Rejoin card */
+.rejoin-card { padding: 14px; }
+.rejoin-result { margin-top: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 12px; }
+.rejoin-behind { font-family: 'Barlow Condensed',sans-serif; font-size: 14px; font-weight: 700; color: var(--text); }
+.rejoin-class  { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 10px; font-weight: 700; letter-spacing: .05em; margin-left: 6px; }
+
+/* Pit projection card */
+.pit-card { padding: 14px; }
+.pit-result { margin-top: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 12px; }
+.pit-pos { font-family: 'Barlow Condensed',sans-serif; font-size: 32px; font-weight: 900; color: var(--lime); }
+.pit-detail { font-size: 11px; color: #aaa; margin-top: 4px; line-height: 1.6; }
+
+/* Legend */
+.legend { display: flex; gap: 10px; flex-wrap: wrap; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #aaa; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Legend */
+.legend { display: flex; gap: 10px; flex-wrap: wrap; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #aaa; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── 3D CONTAINER ── */
+#track-3d-container {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: none;
+  background: #0d0d0d;
+}
+
+/* ── MAP MODE TOGGLE ── */
+.map-mode-toggle {
+  position: absolute;
+  top: 12px; left: 12px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 0;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,.5);
+}
+
+.map-mode-toggle .toggle-pill {
+  position: absolute;
+  top: 3px; left: 3px;
+  height: calc(100% - 6px);
+  border-radius: 4px;
+  background: var(--lime, #C8FF00);
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1), width 0.22s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.map-mode-toggle .toggle-btn {
+  position: relative;
+  z-index: 1;
+  padding: 5px 14px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted, #666);
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+  transition: color 0.18s ease;
+  white-space: nowrap;
+}
+
+.map-mode-toggle .toggle-btn.active {
+  color: #0d0d0d;
+  font-weight: 900;
+}
+
+/* ── 3D LOADING STATE ── */
+#track-3d-container .tm-3d-loading {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px;
+  color: var(--muted, #666);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
+}
+#track-3d-container .tm-3d-loading::before {
+  content: '';
+  width: 24px; height: 24px;
+  border: 2px solid var(--border, #2a2a2a);
+  border-top-color: var(--lime, #C8FF00);
+  border-radius: 50%;
+  animation: spin3d .7s linear infinite;
+}
+@keyframes spin3d { to { transform: rotate(360deg); } }
+
+/* Weather Forecast card */
+.forecast-card { padding: 14px; }
+
+/* ── BLUE FLAG CARDS ── */
+.blueflag-card { padding: 14px; }
+.bf-list { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+.bf-empty { font-size: 11px; color: var(--muted); padding: 8px 0; }
+
+/* Voiture en drapeau bleu (devant nous, même catégorie) */
+.bf-item {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 3px; padding: 7px 10px;
+  transition: border-color .2s, background .2s;
+  position: relative; overflow: hidden;
+}
+.bf-item.bf-5s  { border-color: #1d4ed8; background: rgba(29,78,216,.08); }
+.bf-item.bf-2s  { border-color: #3b8fff; background: rgba(59,143,255,.12); }
+.bf-item.bf-1s  { border-color: #60a5fa; background: rgba(96,165,250,.18); animation: bf-blink .5s step-start infinite; }
+@keyframes bf-blink { 50% { background: rgba(96,165,250,.04); border-color: #1e3a5f; } }
+
+.bf-flag { font-size: 13px; flex-shrink: 0; }
+.bf-pos  { font-family: 'Barlow Condensed',sans-serif; font-size: 13px; font-weight: 900; color: var(--text); min-width: 26px; }
+.bf-name { font-size: 11px; color: #ccc; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bf-gap  { font-family: 'Barlow Condensed',sans-serif; font-size: 12px; font-weight: 700; }
+.bf-gap.bf-close  { color: #60a5fa; }
+.bf-gap.bf-medium { color: #3b8fff; }
+.bf-gap.bf-far    { color: #1d4ed8; }
+.bf-badge { font-size: 8px; font-weight: 700; letter-spacing: .06em; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; }
+
+/* Voiture rapide derrière (threat) */
+.threat-item {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 3px; padding: 7px 10px;
+  transition: border-color .2s, background .2s;
+}
+.threat-item.threat-hot  { border-color: #dc2626; background: rgba(220,38,38,.10); animation: threat-pulse .8s ease-in-out infinite alternate; }
+.threat-item.threat-warn { border-color: #f59e0b; background: rgba(245,158,11,.08); }
+@keyframes threat-pulse { from { background: rgba(220,38,38,.06); } to { background: rgba(220,38,38,.16); } }
+
+.threat-icon { font-size: 12px; flex-shrink: 0; }
+.threat-pos  { font-family: 'Barlow Condensed',sans-serif; font-size: 13px; font-weight: 900; color: var(--text); min-width: 26px; }
+.threat-name { font-size: 11px; color: #ccc; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.threat-gap  { font-family: 'Barlow Condensed',sans-serif; font-size: 12px; font-weight: 700; }
+.threat-gap.hot  { color: #f87171; }
+.threat-gap.warn { color: #fbbf24; }
+.threat-badge { font-size: 8px; font-weight: 700; letter-spacing: .06em; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; }
+.fc-sessions { display: flex; gap: 4px; margin: 10px 0 8px; }
+.fc-tab {
+  flex: 1; padding: 4px 0; text-align: center; font-size: 9px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
+}
+.fc-tab.active { color: var(--lime); border-color: var(--lime); background: rgba(200,255,0,.06); }
+.fc-timeline { display: flex; gap: 2px; }
+.fc-node {
+  flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 3px;
+  padding: 6px 4px; text-align: center; min-width: 0;
+}
+.fc-node.fc-active { border-color: var(--lime); background: rgba(200,255,0,.04); }
+.fc-node-label { font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; white-space: nowrap; }
+.fc-node-row { font-size: 10px; color: #aaa; line-height: 1.7; white-space: nowrap; }
+.fc-node-row .fc-val { color: var(--text); font-weight: 600; font-family: 'Barlow Condensed',sans-serif; }
+.fc-node-row.fc-rain { color: #38bdf8; }
+.fc-node-row.fc-rain .fc-val { color: #38bdf8; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="tm-layout">
+
+  <!-- MAP -->
+  <div class="tm-map-area">
+
+    <!-- 2D / 3D TOGGLE -->
+    <div class="map-mode-toggle" id="map-mode-toggle">
+      <div class="toggle-pill" id="toggle-pill"></div>
+      <div class="toggle-btn active" id="btn-2d" data-mode="2d">2D</div>
+      <div class="toggle-btn"        id="btn-3d" data-mode="3d">3D</div>
+    </div>
+
+    <!-- 2D CANVAS -->
+    <canvas id="track-canvas"></canvas>
+
+    <!-- 3D CONTAINER (lazy-init) -->
+    <div id="track-3d-container">
+      <div class="tm-3d-loading">Initialising 3D…</div>
+    </div>
+
+    <div class="car-tooltip" id="car-tooltip">
+      <div class="tt-name" id="tt-name"></div>
+      <div class="tt-row"><span>Position</span><span class="tt-val" id="tt-pos"></span></div>
+      <div class="tt-row"><span>Class</span><span class="tt-val" id="tt-class"></span></div>
+      <div class="tt-row"><span>Last Lap</span><span class="tt-val" id="tt-lap"></span></div>
+      <div class="tt-row"><span>VE Level</span><span class="tt-val" id="tt-ve"></span></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="tm-sidebar">
+
+    <!-- Weather -->
+    <div class="card weather-card">
+      <div class="section-label">Weather & Track</div>
+      <div class="weather-grid">
+        <div class="w-item"><div class="w-key">Track Temp</div><div class="w-val" id="w-track">—</div></div>
+        <div class="w-item"><div class="w-key">Air Temp</div><div class="w-val" id="w-air">—</div></div>
+        <div class="w-item"><div class="w-key">Rain</div><div class="w-val" id="w-rain">Dry</div></div>
+        <div class="w-item"><div class="w-key">Grip</div><div class="w-val" id="w-grip">—</div></div>
+        <div class="w-item"><div class="w-key">Wetness</div><div class="w-val" id="w-wet">—</div></div>
+        <div class="w-item"><div class="w-key">Wind</div><div class="w-val" id="w-wind">—</div></div>
+        <div class="w-item"><div class="w-key">Sky</div><div class="w-val" id="w-sky">—</div></div>
+        <div class="w-item"><div class="w-key">Time</div><div class="w-val" id="w-tod">—</div></div>
+      </div>
+    </div>
+
+    <!-- Weather Forecast -->
+    <div class="card forecast-card" id="forecast-card" style="display:none">
+      <div class="section-label">Weather Forecast</div>
+      <div class="fc-sessions" id="fc-sessions"></div>
+      <div class="fc-timeline" id="fc-timeline"></div>
+    </div>
+
+    <!-- Rejoin projection -->
+    <div class="card rejoin-card">
+      <div class="section-label">Pit Rejoin Traffic</div>
+      <div class="rejoin-result" id="rejoin-result">
+        <div style="font-size:10px;color:#888;margin-bottom:6px">You would rejoin behind</div>
+        <div id="rejoin-content" style="color:#888;font-size:12px">Waiting for data...</div>
+      </div>
+    </div>
+
+    <!-- Pit projection -->
+    <div class="card pit-card">
+      <div class="section-label">Pit Stop Projection</div>
+      <div class="pit-result">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">Exit position</div>
+        <div class="pit-pos" id="pit-exit-pos">—</div>
+        <div class="pit-detail" id="pit-detail">Waiting for data...</div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:8px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Pit estimate</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div class="w-item"><div class="w-key">Total</div><div class="w-val lime" id="pe-total">—s</div></div>
+          <div class="w-item"><div class="w-key">Fuel/VE</div><div class="w-val" id="pe-fuel">—s</div></div>
+          <div class="w-item"><div class="w-key">Tyres</div><div class="w-val" id="pe-tyres">—s</div></div>
+          <div class="w-item"><div class="w-key">Damage</div><div class="w-val" id="pe-dmg">—s</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drapeau Bleu — voitures à dépasser -->
+    <div class="card blueflag-card" id="blueflag-card">
+      <div class="section-label">🟦 Drapeau Bleu — À dépasser</div>
+      <div class="bf-list" id="bf-list">
+        <div class="bf-empty">En attente de données…</div>
+      </div>
+    </div>
+
+    <!-- Menaces derrière -->
+    <div class="card blueflag-card" id="threat-card">
+      <div class="section-label">⚠ Menaces derrière</div>
+      <div class="bf-list" id="threat-list">
+        <div class="bf-empty">En attente de données…</div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card" style="padding:12px">
+      <div class="section-label">Legend</div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-dot" style="background:#e11d48"></div>HY</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#3b8fff"></div>LMP2</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#a855f7"></div>LMP3</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>GTE</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#ff8c00"></div>GT3</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#fff;border:2px solid #C8FF00"></div>You</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+renderHeader('lineup', 'pitwall-trackmap')
+if (_checkPopoutOverlay('pitwall-trackmap')) throw ''
+
+// ── STATE ──
+const canvas = document.getElementById('track-canvas')
+const ctx    = canvas.getContext('2d')
+let trackPoints = { main: [], pit: [] }
+let trackBounds = null
+let standings   = []
+let playerData  = {}
+let sessionData = {}
+let pitEstimate = {}
+let pitLoss     = 25
+let _transform  = null   // saved for hover hit-testing
+
+// ── 3D STATE ──
+let is3DMode      = false
+let map3DInstance = null
+
+// ── MAP MODE TOGGLE LOGIC ──
+;(function initMapModeToggle() {
+  const toggle = document.getElementById('map-mode-toggle')
+  const pill   = document.getElementById('toggle-pill')
+  const btn2d  = document.getElementById('btn-2d')
+  const btn3d  = document.getElementById('btn-3d')
+
+  // Size the pill on first frame (buttons must be laid out)
+  requestAnimationFrame(() => {
+    pill.style.width  = btn2d.offsetWidth + 'px'
+    pill.style.height = btn2d.offsetHeight + 'px'
+  })
+
+  function slidePill(btn) {
+    pill.style.width     = btn.offsetWidth + 'px'
+    pill.style.transform = btn === btn3d
+      ? `translateX(${btn3d.offsetLeft - btn2d.offsetLeft}px)`
+      : 'translateX(0)'
+  }
+
+  toggle.addEventListener('click', e => {
+    const btn = e.target.closest('.toggle-btn')
+    if (!btn) return
+    setMapMode(btn.dataset.mode)
+  })
+
+  window.setMapMode = function setMapMode(mode) {
+    is3DMode = (mode === '3d')
+
+    // Update pill & active class
+    btn2d.classList.toggle('active', !is3DMode)
+    btn3d.classList.toggle('active',  is3DMode)
+    slidePill(is3DMode ? btn3d : btn2d)
+
+    // Toggle visibility
+    canvas.style.display           = is3DMode ? 'none' : 'block'
+    document.getElementById('track-3d-container').style.display = is3DMode ? 'block' : 'none'
+
+    if (is3DMode) {
+      // ── LAZY INIT ──
+      if (!map3DInstance) {
+        if (typeof TrackMap3D === 'undefined') {
+          console.warn('[Pitwall] TrackMap3D class not found. Load telemetry-3d.js first.')
+          return
+        }
+        map3DInstance = new TrackMap3D('track-3d-container')
+
+        // Pass current track geometry if already loaded
+        if (trackPoints.main.length) {
+          map3DInstance.setTrackPoints(trackPoints)
+        }
+      } else {
+        // Re-sync in case track points arrived while 3D was hidden
+        if (trackPoints.main.length && map3DInstance.setTrackPoints) {
+          map3DInstance.setTrackPoints(trackPoints)
+        }
+      }
+
+      // Feed current standings immediately
+      if (standings.length && map3DInstance.updateCars) {
+        map3DInstance.updateCars(standings)
+      }
+    }
+  }
+})()
+
+// ── RESIZE ──
+function resize() {
+  canvas.width  = canvas.offsetWidth
+  canvas.height = canvas.offsetHeight
+  draw()
+}
+window.addEventListener('resize', resize)
+
+// ── TRACK DATA ──
+function _applyTrackPoints(raw) {
+  if (!raw || !Array.isArray(raw) || !raw.length) return false
+  trackPoints = {
+    main: raw.filter(p => p.type === 0),
+    pit:  raw.filter(p => p.type === 1)
+  }
+  // Fallback: if no type field, treat all as main
+  if (!trackPoints.main.length && raw.length) trackPoints.main = raw
+  if (trackPoints.main.length) {
+    const all = [...trackPoints.main, ...trackPoints.pit]
+    const xs = all.map(p => p.x), zs = all.map(p => p.z)
+    trackBounds = {
+      minX: Math.min(...xs), maxX: Math.max(...xs),
+      minZ: Math.min(...zs), maxZ: Math.max(...zs)
+    }
+  }
+  resize()
+
+  // If 3D is already active, forward the new geometry
+  if (is3DMode && map3DInstance && map3DInstance.setTrackPoints) {
+    map3DInstance.setTrackPoints(trackPoints)
+  }
+
+  return true
+}
+
+async function loadTrackMap() {
+  // 1) Try direct LMU REST (only works on pilot PC)
+  try {
+    const res = await fetch('http://localhost:6397/rest/watch/trackmap', { signal: AbortSignal.timeout(2000) })
+    if (res.ok) {
+      const raw = await res.json()
+      if (_applyTrackPoints(raw)) return
+    }
+  } catch {}
+  // 2) Try local backend proxy
+  try {
+    const res = await fetch('http://localhost:5000/api/get-track-map', { cache: 'no-store', signal: AbortSignal.timeout(2000) })
+    if (res.ok) {
+      const raw = await res.json()
+      if (_applyTrackPoints(Array.isArray(raw) ? raw : (raw.points || raw.trackPoints || []))) return
+    }
+  } catch {}
+  // 3) Track map will arrive via session WebSocket data (for spectators)
+}
+
+// ── DRAW ──
+function draw() {
+  // ── 3D MODE: delegate to Three.js renderer, skip 2D canvas work ──
+  if (is3DMode) {
+    if (map3DInstance && standings.length && map3DInstance.updateCars) {
+      map3DInstance.updateCars(standings)
+    }
+    return
+  }
+
+  const W = canvas.width, H = canvas.height
+  ctx.clearRect(0, 0, W, H)
+  ctx.fillStyle = '#0d0d0d'
+  ctx.fillRect(0, 0, W, H)
+
+  if (!standings.length) {
+    ctx.fillStyle = '#333'
+    ctx.font = '600 13px Barlow, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('Waiting for data...', W / 2, H / 2)
+    return
+  }
+
+  // ── BOUNDS — use track data (stable), fallback to car positions ──
+  let bounds
+  if (trackBounds) {
+    bounds = trackBounds
+  } else {
+    const cars = standings.filter(c => c.pos_x != null && c.pos_z != null)
+    if (!cars.length) return
+    const xs = cars.map(c => c.pos_x), zs = cars.map(c => c.pos_z)
+    bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) }
+  }
+
+  const pad = 60
+  const rangeX = Math.max(1, bounds.maxX - bounds.minX)
+  const rangeZ = Math.max(1, bounds.maxZ - bounds.minZ)
+  const scale  = Math.min((W - pad * 2) / rangeX, (H - pad * 2) / rangeZ)
+  const offX   = pad + (W - pad * 2 - rangeX * scale) / 2
+  const offZ   = pad + (H - pad * 2 - rangeZ * scale) / 2
+  const toX    = x => offX + (x - bounds.minX) * scale
+  const toZ    = z => H - (offZ + (z - bounds.minZ) * scale)
+
+  // Save transform for hover
+  _transform = { toX, toZ, scale }
+
+  // ── DRAW TRACK ──
+  if (trackPoints.main.length > 2) {
+    const main = trackPoints.main
+    // Thick background
+    ctx.beginPath()
+    ctx.moveTo(toX(main[0].x), toZ(main[0].z))
+    for (let i = 1; i < main.length; i++) ctx.lineTo(toX(main[i].x), toZ(main[i].z))
+    ctx.closePath()
+    ctx.strokeStyle = '#1e1e1e'
+    ctx.lineWidth = 14
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.stroke()
+
+    // Center line
+    ctx.beginPath()
+    ctx.moveTo(toX(main[0].x), toZ(main[0].z))
+    for (let i = 1; i < main.length; i++) ctx.lineTo(toX(main[i].x), toZ(main[i].z))
+    ctx.closePath()
+    ctx.strokeStyle = '#333'
+    ctx.lineWidth = 3
+    ctx.stroke()
+
+    // Pit lane
+    if (trackPoints.pit.length > 1) {
+      ctx.beginPath()
+      const pit = trackPoints.pit
+      ctx.moveTo(toX(pit[0].x), toZ(pit[0].z))
+      for (let i = 1; i < pit.length; i++) ctx.lineTo(toX(pit[i].x), toZ(pit[i].z))
+      ctx.strokeStyle = '#555'
+      ctx.lineWidth = 3
+      ctx.setLineDash([6, 6])
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+  }
+
+  // ── DRAW CARS ──
+  const cars = standings.filter(c => c.pos_x != null && c.pos_z != null)
+  // Draw non-player first, then player on top
+  const sorted = [...cars].sort((a, b) => (a.is_player ? 1 : 0) - (b.is_player ? 1 : 0))
+
+  sorted.forEach(car => {
+    const x   = toX(car.pos_x)
+    const z   = toZ(car.pos_z)
+    const col = classColor(car.vehicle_class)
+    const isP = car.is_player
+    const r   = isP ? 8 : 5
+
+    // Car dot
+    ctx.beginPath()
+    ctx.arc(x, z, r, 0, Math.PI * 2)
+    ctx.fillStyle = isP ? '#fff' : col
+    ctx.fill()
+
+    // Player ring
+    if (isP) {
+      ctx.beginPath()
+      ctx.arc(x, z, r + 3, 0, Math.PI * 2)
+      ctx.strokeStyle = '#C8FF00'
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+
+    // Pit indicator
+    if (car.in_pits) {
+      ctx.beginPath()
+      ctx.arc(x, z, r + 5, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(200,255,0,.35)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    // Position label
+    ctx.fillStyle = isP ? '#C8FF00' : '#888'
+    ctx.font = `${isP ? '700' : '500'} ${isP ? 11 : 9}px Barlow Condensed, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.fillText(`P${car.position}`, x, z - r - 5)
+  })
+
+  // ── DRAW REJOIN MARKER ──
+  drawRejoinMarker(toX, toZ)
+}
+
+// ── REJOIN MARKER on map ──
+let _rejoinCar = null
+
+function drawRejoinMarker(toX, toZ) {
+  if (!_rejoinCar || _rejoinCar.pos_x == null) return
+  const x = toX(_rejoinCar.pos_x)
+  const z = toZ(_rejoinCar.pos_z)
+
+  // Pulsing ring
+  ctx.beginPath()
+  ctx.arc(x, z, 14, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(250,204,21,.6)'
+  ctx.lineWidth = 2
+  ctx.setLineDash([4, 3])
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  ctx.fillStyle = '#facc15'
+  ctx.font = '700 9px Barlow Condensed, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('REJOIN', x, z + 20)
+}
+
+// ── HOVER TOOLTIP ──
+const tooltip = document.getElementById('car-tooltip')
+
+canvas.addEventListener('mousemove', e => {
+  if (!_transform || !standings.length) { tooltip.style.display = 'none'; return }
+
+  const rect = canvas.getBoundingClientRect()
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width)
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height)
+
+  let closest = null, minDist = 18
+  standings.forEach(car => {
+    if (car.pos_x == null) return
+    const cx = _transform.toX(car.pos_x)
+    const cz = _transform.toZ(car.pos_z)
+    const d = Math.sqrt((mx - cx) ** 2 + (my - cz) ** 2)
+    if (d < minDist) { minDist = d; closest = car }
+  })
+
+  if (closest) {
+    tooltip.style.display = 'block'
+    // Position relative to map area
+    const tx = e.clientX - rect.left + 14
+    const ty = e.clientY - rect.top - 10
+    // Flip if near edges
+    tooltip.style.left = tx + 160 > rect.width ? (tx - 170) + 'px' : tx + 'px'
+    tooltip.style.top  = ty < 10 ? '10px' : ty + 'px'
+
+    const col = classColor(closest.vehicle_class)
+    document.getElementById('tt-name').textContent = closest.name || '—'
+    document.getElementById('tt-name').style.color = col
+    document.getElementById('tt-pos').textContent = `P${closest.position}`
+    document.getElementById('tt-class').textContent = closest.vehicle_class || '—'
+    document.getElementById('tt-class').style.color = col
+    document.getElementById('tt-lap').textContent = closest.last_lap > 0 ? fmtLap(closest.last_lap) : '—'
+    document.getElementById('tt-ve').textContent = closest.fuel_fraction != null ? `${Math.round(closest.fuel_fraction)}%` : '—'
+  } else {
+    tooltip.style.display = 'none'
+  }
+})
+
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none' })
+
+// ── REJOIN TRAFFIC CALCULATION ──
+// Finds which car (any class) you'd rejoin behind based on TRACK position (lap_dist), not race position
+function calcRejoinTraffic() {
+  if (!standings.length) return
+  const player = standings.find(c => c.is_player)
+  if (!player || player.lap_dist == null) return
+
+  const pitDuration = (pitEstimate.total || pitLoss)
+  const avgLap = player.last_lap > 0 ? player.last_lap : 120
+  // Track length approximation from track data or lap dist
+  const trackLen = trackBounds ? Math.sqrt((trackBounds.maxX - trackBounds.minX) ** 2 + (trackBounds.maxZ - trackBounds.minZ) ** 2) * 3 : 5000
+  // How much lap_dist other cars cover during our pit stop
+  const distPerSec = trackLen / avgLap
+
+  // Build track-order list: absolute distance = total_laps * trackLen + lap_dist
+  const carsOnTrack = standings
+    .filter(c => !c.in_pits && c.lap_dist != null && !c.is_player)
+    .map(c => ({
+      ...c,
+      absPos: c.total_laps * trackLen + c.lap_dist
+    }))
+
+  const playerAbsPos = player.total_laps * trackLen + player.lap_dist
+
+  // During pit stop, other cars advance by distPerSec * pitDuration
+  const advanceDist = distPerSec * pitDuration
+
+  // Player exits pit at roughly their current absPos (they don't advance)
+  // All other cars advance by advanceDist
+  // Find the car that would be just ahead of us after the pit
+  const projectedCars = carsOnTrack.map(c => ({
+    ...c,
+    projAbsPos: c.absPos + advanceDist
+  }))
+
+  // Cars that would be ahead of our exit position
+  const carsAhead = projectedCars
+    .filter(c => c.projAbsPos > playerAbsPos)
+    .sort((a, b) => a.projAbsPos - b.projAbsPos)
+
+  // The car closest ahead = the one we'd rejoin behind
+  // But also look at cars just behind that are very close (traffic context)
+  const rejoinEl = document.getElementById('rejoin-content')
+
+  if (carsAhead.length === 0) {
+    rejoinEl.innerHTML = '<span style="color:var(--lime)">Clear track — no traffic ahead</span>'
+    _rejoinCar = null
+    return
+  }
+
+  // The car just ahead
+  const behind = carsAhead[0]
+  _rejoinCar = behind
+
+  const col = classColor(behind.vehicle_class)
+  const catLabel = (behind.vehicle_class || '').toUpperCase()
+
+  // Count nearby cars (within 3s of driving)
+  const nearbyDist = distPerSec * 3
+  const nearbyCars = carsAhead.filter(c => c.projAbsPos - playerAbsPos < nearbyDist)
+
+  let trafficWarning = ''
+  if (nearbyCars.length >= 3) {
+    trafficWarning = `<div style="color:#facc15;font-size:10px;margin-top:6px">⚠ ${nearbyCars.length} cars within 3s — heavy traffic</div>`
+  } else if (nearbyCars.length >= 2) {
+    trafficWarning = `<div style="color:#aaa;font-size:10px;margin-top:6px">${nearbyCars.length} cars within 3s</div>`
+  }
+
+  rejoinEl.innerHTML = `
+    <div class="rejoin-behind">
+      P${behind.position} ${esc(behind.name)}
+      <span class="rejoin-class" style="background:${col}22;color:${col}">${catLabel}</span>
+    </div>
+    <div style="font-size:10px;color:#888;margin-top:4px">${esc(behind.vehicle || '')}</div>
+    ${trafficWarning}
+  `
+}
+
+// ── BLUE FLAG & THREAT LOGIC ──
+
+// Ordre hiérarchique des catégories (plus l'index est bas = plus rapide)
+const CLASS_HIERARCHY = ['HY', 'LMP2', 'LMP3', 'GTE', 'GT3']
+
+function classRank(cls) {
+  if (!cls) return 99
+  const k = (cls || '').toUpperCase()
+  for (let i = 0; i < CLASS_HIERARCHY.length; i++) {
+    if (k.includes(CLASS_HIERARCHY[i])) return i
+  }
+  return 99
+}
+
+function isFasterClass(theirCls, ourCls) {
+  return classRank(theirCls) < classRank(ourCls)
+}
+
+function isSameClass(theirCls, ourCls) {
+  return classRank(theirCls) === classRank(ourCls)
+}
+
+// Gap en secondes entre deux voitures à partir de leur lap_dist et last_lap
+// gap > 0 = `other` est DEVANT `ref` sur la piste
+function gapOnTrack(ref, other, trackLen) {
+  if (ref.lap_dist == null || other.lap_dist == null) return null
+  const refAbs   = ref.total_laps   * trackLen + ref.lap_dist
+  const otherAbs = other.total_laps * trackLen + other.lap_dist
+  const distDiff = otherAbs - refAbs  // positif = other devant
+  const avgLap   = (ref.last_lap > 0 ? ref.last_lap : (other.last_lap > 0 ? other.last_lap : 120))
+  return distDiff / (trackLen / avgLap)  // secondes
+}
+
+function calcBlueFlagAndThreats() {
+  if (!standings.length) return
+
+  const player = standings.find(c => c.is_player)
+  if (!player || player.lap_dist == null) {
+    document.getElementById('bf-list').innerHTML     = '<div class="bf-empty">En attente de données…</div>'
+    document.getElementById('threat-list').innerHTML = '<div class="bf-empty">En attente de données…</div>'
+    return
+  }
+
+  const trackLen = trackBounds
+    ? Math.sqrt((trackBounds.maxX - trackBounds.minX) ** 2 + (trackBounds.maxZ - trackBounds.minZ) ** 2) * 3
+    : 5000
+
+  const others = standings.filter(c => !c.is_player && !c.in_pits && c.lap_dist != null)
+
+  // ── DRAPEAU BLEU : voitures DEVANT nous (même catégorie) qu'on doit dépasser
+  // (on est plus rapide = classement de course meilleur que le leur dans notre classe)
+  const bfCars = []
+  others.forEach(car => {
+    if (!isSameClass(car.vehicle_class, player.vehicle_class)) return
+    const gap = gapOnTrack(player, car, trackLen)  // positif = car devant nous
+    if (gap == null || gap <= 0 || gap > 10) return  // on s'intéresse à max 10s devant
+    // Drapeau bleu seulement si on a un meilleur classement de course
+    if (car.position > player.position) return  // ils sont derrière au classement → pas de bf
+    bfCars.push({ ...car, gapAhead: gap })
+  })
+  bfCars.sort((a, b) => a.gapAhead - b.gapAhead)
+
+  const bfEl = document.getElementById('bf-list')
+  if (!bfCars.length) {
+    bfEl.innerHTML = '<div class="bf-empty" style="color:var(--lime);font-size:11px">✓ Piste libre devant</div>'
+  } else {
+    bfEl.innerHTML = bfCars.map(car => {
+      const g = car.gapAhead
+      let urgency, gapClass, label
+      if (g <= 1) { urgency = 'bf-1s'; gapClass = 'bf-close';  label = 'IMMINENT' }
+      else if (g <= 2) { urgency = 'bf-2s'; gapClass = 'bf-close';  label = `${g.toFixed(1)}s` }
+      else             { urgency = 'bf-5s'; gapClass = 'bf-far';    label = `${g.toFixed(1)}s` }
+      const col = classColor(car.vehicle_class)
+      return `<div class="bf-item ${urgency}">
+        <span class="bf-flag">🟦</span>
+        <span class="bf-pos">P${car.position}</span>
+        <span class="bf-name">${esc(car.name || '')}</span>
+        <span class="bf-gap ${gapClass}">${label}</span>
+        <span class="bf-badge" style="background:${col}22;color:${col}">${(car.vehicle_class||'').toUpperCase()}</span>
+      </div>`
+    }).join('')
+  }
+
+  // ── MENACES DERRIÈRE : voitures qui arrivent (toutes catégories)
+  // Seuils : 5s pour catégorie supérieure, 2s pour même catégorie
+  const threats = []
+  others.forEach(car => {
+    const gap = gapOnTrack(player, car, trackLen)  // positif = car devant, négatif = car derrière
+    if (gap == null || gap >= 0) return  // on veut les voitures derrière (gap < 0)
+    const behindSec = Math.abs(gap)
+    const sameCls  = isSameClass(car.vehicle_class, player.vehicle_class)
+    const fasterCls = isFasterClass(car.vehicle_class, player.vehicle_class)
+    const threshold = fasterCls ? 5 : (sameCls ? 2 : null)
+    if (threshold == null || behindSec > threshold) return
+    threats.push({ ...car, behindSec, fasterCls, sameCls })
+  })
+  threats.sort((a, b) => a.behindSec - b.behindSec)
+
+  const thrEl = document.getElementById('threat-list')
+  if (!threats.length) {
+    thrEl.innerHTML = '<div class="bf-empty" style="color:var(--lime);font-size:11px">✓ Rien derrière</div>'
+  } else {
+    thrEl.innerHTML = threats.map(car => {
+      const hot = car.behindSec <= 1.5
+      const col = classColor(car.vehicle_class)
+      const badge = car.fasterCls ? `<span class="threat-badge" style="background:#dc262622;color:#f87171">PLUS RAPIDE</span>` : ''
+      return `<div class="threat-item ${hot ? 'threat-hot' : 'threat-warn'}">
+        <span class="threat-icon">${car.fasterCls ? '🔴' : '🟡'}</span>
+        <span class="threat-pos">P${car.position}</span>
+        <span class="threat-name">${esc(car.name || '')}</span>
+        <span class="threat-gap ${hot ? 'hot' : 'warn'}">-${car.behindSec.toFixed(1)}s</span>
+        <span class="threat-badge" style="background:${col}22;color:${col}">${(car.vehicle_class||'').toUpperCase()}</span>
+        ${badge}
+      </div>`
+    }).join('')
+  }
+}
+
+// ── PIT PROJECTION (race position) ──
+function calcPitProjection() {
+  if (!standings.length) return
+  const sorted  = [...standings].sort((a, b) => a.position - b.position)
+  const player  = sorted.find(c => c.is_player)
+  if (!player) return
+
+  const pitDuration = (pitEstimate.total || pitLoss) + pitLoss
+
+  let exitPos = player.position
+  const carsAhead = sorted.filter(c => c.position < player.position && !c.is_player)
+  let passedBy = 0
+  carsAhead.forEach(car => {
+    const gapToThem = (player.time_behind_leader || 0) - (car.time_behind_leader || 0)
+    if (gapToThem >= 0 && gapToThem < pitDuration) passedBy++
+  })
+  exitPos = Math.min(standings.length, player.position + passedBy)
+
+  document.getElementById('pit-exit-pos').textContent = `P${exitPos}`
+  const lost = exitPos - player.position
+  document.getElementById('pit-detail').innerHTML =
+    `Currently P${player.position} · Pit ~${Math.round(pitDuration)}s<br>` +
+    `Exit: <strong style="color:${lost > 0 ? 'var(--red)' : 'var(--lime)'}">P${exitPos}</strong>` +
+    (lost > 0 ? ` (${lost} pos lost)` : ' (no positions lost)')
+
+  if (pitEstimate.total) {
+    setText('pe-total', `${pitEstimate.total.toFixed(1)}s`)
+    setText('pe-fuel',  `${(pitEstimate.fuel || pitEstimate.ve || 0).toFixed(1)}s`)
+    setText('pe-tyres', `${(pitEstimate.tires || 0).toFixed(1)}s`)
+    setText('pe-dmg',   `${(pitEstimate.damage || 0).toFixed(1)}s`)
+  }
+}
+
+// ── WEATHER ──
+const GRIP_LABELS = ['Green', 'Low', 'Medium', 'Heavy', 'Saturated']
+const SKY_LABELS  = ['Clear', 'Light clouds', 'Partly cloudy', 'Mostly cloudy', 'Overcast', 'Drizzle', 'Light rain', 'Overcast rain', 'Rain', 'Heavy rain', 'Storm']
+const WIND_DIRS   = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+
+function windDirLabel(deg) {
+  if (deg == null) return ''
+  return WIND_DIRS[Math.round(deg / 45) % 8]
+}
+
+function timeOfDayStr(tod) {
+  if (tod == null) return '—'
+  const totalSec = Math.round(tod)
+  const h = Math.floor(totalSec / 3600) % 24
+  const m = Math.floor((totalSec % 3600) / 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// ── WEATHER FORECAST ──
+let _forecastData = null
+let _fcSession = null  // currently selected session tab
+
+const FC_NODE_ORDER = ['START', 'NODE_25', 'NODE_50', 'NODE_75', 'FINISH']
+const FC_NODE_LABELS = { START: 'Start', NODE_25: '25%', NODE_50: '50%', NODE_75: '75%', FINISH: 'End' }
+const FC_SESSION_ORDER = ['PRACTICE', 'QUALIFY', 'RACE']
+
+async function loadForecast() {
+  // 1) Try local backend proxy
+  try {
+    const res = await fetch('http://localhost:5000/api/weather-forecast', { signal: AbortSignal.timeout(2000) })
+    if (res.ok) {
+      const data = await res.json()
+      if (!data.error) { _forecastData = data; renderForecastTabs(); return }
+    }
+  } catch {}
+  // 2) Already have forecast from session data (spectator)
+  if (_forecastData) renderForecastTabs()
+}
+
+function renderForecastTabs() {
+  if (!_forecastData) return
+  const available = FC_SESSION_ORDER.filter(s => _forecastData[s])
+  if (!available.length) return
+
+  document.getElementById('forecast-card').style.display = ''
+
+  // Auto-select current session if possible
+  if (!_fcSession || !_forecastData[_fcSession]) {
+    // Try to match current session type
+    const curType = (sessionData.session_type || '').toUpperCase()
+    if (curType.includes('RACE')) _fcSession = 'RACE'
+    else if (curType.includes('QUAL')) _fcSession = 'QUALIFY'
+    else if (curType.includes('PRAC') || curType.includes('WARM')) _fcSession = 'PRACTICE'
+    else _fcSession = available[0]
+  }
+
+  const container = document.getElementById('fc-sessions')
+  container.innerHTML = available.map(s =>
+    `<div class="fc-tab${s === _fcSession ? ' active' : ''}" data-session="${s}">${s.charAt(0) + s.slice(1).toLowerCase()}</div>`
+  ).join('')
+
+  container.querySelectorAll('.fc-tab').forEach(el => {
+    el.onclick = () => { _fcSession = el.dataset.session; renderForecastTabs() }
+  })
+
+  renderForecastTimeline()
+}
+
+function renderForecastTimeline() {
+  const session = _forecastData[_fcSession]
+  if (!session) return
+
+  const timeline = document.getElementById('fc-timeline')
+  const nodes = FC_NODE_ORDER.filter(n => session[n])
+
+  // Determine current progress within session (0-100%) based on elapsed time
+  const curProgress = guessSessionProgress(session)
+
+  timeline.innerHTML = nodes.map((nk, i) => {
+    const n = session[nk]
+    const temp = n.WNV_TEMPERATURE ? Math.round(n.WNV_TEMPERATURE.currentValue) : '—'
+    const humid = n.WNV_HUMIDITY ? Math.round(n.WNV_HUMIDITY.currentValue) : '—'
+    let rain = n.WNV_RAIN_CHANCE ? Math.round(n.WNV_RAIN_CHANCE.currentValue) : 0
+    if (rain > 100) rain = 0
+    const sky = n.WNV_SKY ? n.WNV_SKY.stringValue : '—'
+    const windSpd = n.WNV_WIND_SPEED ? Math.round(n.WNV_WIND_SPEED.currentValue) : '—'
+    const windDir = n.WNV_WIND_DIRECTION ? n.WNV_WIND_DIRECTION.stringValue : ''
+
+    // Highlight current node
+    const pcts = [0, 25, 50, 75, 100]
+    const isActive = curProgress != null && i > 0
+      ? curProgress >= pcts[i - 1] && curProgress < pcts[i]
+      : curProgress != null && i === 0 && curProgress < 25
+
+    const rainClass = rain > 0 ? ' fc-rain' : ''
+
+    return `<div class="fc-node${isActive ? ' fc-active' : ''}">
+      <div class="fc-node-label">${FC_NODE_LABELS[nk]}</div>
+      <div class="fc-node-row"><span class="fc-val">${temp}°</span></div>
+      <div class="fc-node-row${rainClass}"><span class="fc-val">${rain}%</span> rain</div>
+      <div class="fc-node-row"><span class="fc-val">${humid}%</span> hum</div>
+      <div class="fc-node-row" style="font-size:9px">${shortenSky(sky)}</div>
+      <div class="fc-node-row" style="font-size:9px"><span class="fc-val">${windSpd}</span> ${windDir}</div>
+    </div>`
+  }).join('')
+}
+
+function shortenSky(s) {
+  if (!s) return '—'
+  return s.replace('Light ', 'Lt ').replace('Mostly ', 'Most ').replace('Partly ', 'Part ').replace('Overcast', 'Ovcst')
+}
+
+function guessSessionProgress(session) {
+  // Use time_of_day from current session data to estimate progress within session
+  if (!sessionData.time_of_day) return null
+  const startNode = session.START
+  if (!startNode || !startNode.WNV_START_TIME) return null
+
+  const startTime = startNode.WNV_START_TIME.currentValue
+  const duration = startNode.WNV_DURATION ? startNode.WNV_DURATION.currentValue : 0
+  if (!duration) return null
+
+  const elapsed = sessionData.time_of_day - startTime
+  if (elapsed < 0) return null
+  return Math.min(100, Math.max(0, (elapsed / duration) * 100))
+}
+
+// ── WEBSOCKET ──
+const _tmHandlers = {
+  onSession(s) {
+    sessionData = s
+    setText('w-track', s.track_temp != null ? `${s.track_temp}°C` : '—')
+    setText('w-air',   s.air_temp   != null ? `${s.air_temp}°C`   : '—')
+    setText('w-rain',  s.is_raining ? `${Math.round((s.rain_intensity || 0) * 100)}%` : 'Dry')
+    setText('w-grip',  s.track_grip != null ? (GRIP_LABELS[s.track_grip] || s.track_grip) : '—')
+    setText('w-sky',   s.cloud_coverage != null ? (SKY_LABELS[s.cloud_coverage] || '—') : '—')
+
+    // Wetness range
+    const avgW = s.track_wetness, minW = s.min_wetness, maxW = s.max_wetness
+    if (avgW != null) {
+      const range = (minW != null && maxW != null && Math.abs(maxW - minW) > 1)
+        ? `${Math.round(minW)}–${Math.round(maxW)}%`
+        : `${Math.round(avgW)}%`
+      setText('w-wet', range)
+    }
+
+    // Wind
+    if (s.wind_speed != null) {
+      setText('w-wind', `${s.wind_speed} km/h ${windDirLabel(s.wind_dir)}`)
+    }
+
+    // Time of day
+    const tod = s.time_of_day
+    setText('w-tod', timeOfDayStr(tod))
+
+    if (s.pit_estimate) {
+      pitEstimate = s.pit_estimate
+      calcPitProjection()
+      calcRejoinTraffic()
+    }
+
+    // Track map data from session (spectator mode)
+    if (!trackPoints.main.length && s.track_map && Array.isArray(s.track_map) && s.track_map.length) {
+      _applyTrackPoints(s.track_map)
+    }
+
+    // Weather forecast from session data (spectator mode)
+    if (s.weather_forecast && typeof s.weather_forecast === 'object' && !s.weather_forecast.error) {
+      _forecastData = s.weather_forecast
+      renderForecastTabs()
+    }
+
+    // Update forecast active highlight
+    if (_forecastData) renderForecastTabs()
+  },
+  onDriver(d) { playerData = d },
+  onStandings(s) {
+    standings = s
+    calcPitProjection()
+    calcRejoinTraffic()
+    calcBlueFlagAndThreats()
+    draw()
+  },
+  onStatus(s) { setLiveDot(s === 'connected') },
+}
+
+let socket = null;
+let currentSocketType = null;
+
+async function checkAndSwitchSocket() {
+  let hasLocalData = false;
+  let isDriving = false;
+  
+  try {
+    const r = await fetch('http://localhost:5000/api/cache', { cache: 'no-store', signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      const cache = await r.json();
+      hasLocalData = Object.keys(cache.fast || {}).length > 0;
+      isDriving = cache.slow && cache.slow.is_driving === true;
+    }
+  } catch {}
+
+  let targetType = (hasLocalData && isDriving) ? 'local' : (lineupId ? 'vps' : 'local');
+
+  if (targetType !== currentSocketType) {
+    console.info(`[Pitwall Trackmap] Bascule du socket : ${currentSocketType || 'aucun'} -> ${targetType}`);
+    if (socket) {
+      socket.close();
+    }
+    currentSocketType = targetType;
+    
+    if (targetType === 'local') {
+      socket = new LocalSocket(_tmHandlers); // <--- Note bien le _tmHandlers ici
+    } else {
+      socket = new PitwallSocket(lineupId, _tmHandlers); // <--- Et ici
+    }
+    socket.connect();
+  }
+}
+
+checkAndSwitchSocket();
+setInterval(checkAndSwitchSocket, 3000);
+
+resize()
+loadTrackMap()
+loadForecast()
+setInterval(loadForecast, 30000) // refresh forecast every 30s
+</script>
+</body>
+</html>

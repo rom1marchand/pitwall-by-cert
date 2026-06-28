@@ -1,0 +1,16 @@
+{
+  "toggleShow": {
+    "joy_id": 1,
+    "button_id": 25
+  },
+  "focusNext": {
+    "joy_id": 1,
+    "button_id": 7
+  },
+  "focusPrev": null,
+  "pageNext": {
+    "joy_id": 1,
+    "button_id": 2
+  },
+  "pagePrev": null
+}

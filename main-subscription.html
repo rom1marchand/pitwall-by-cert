@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plans — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<script src="sidebar.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#111111; --card:#1c1c1c; --card-hover:#242424;
+  --green:#A3E635; --text:#FFFFFF; --muted:#A1A1AA; --border:#333333;
+  --red:#EF4444; --orange:#D97706; --blue:#60a5fa; --lime:#A3E635;
+}
+html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--text);
+  font-family:'Barlow',sans-serif; -webkit-font-smoothing:antialiased; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#555; }
+
+.app-shell { display:flex; height:100vh; overflow:hidden; }
+
+/* MAIN */
+.main-content { flex:1; display:flex; flex-direction:column; height:100%; overflow:hidden; }
+
+/* SCROLL */
+.scroll-area { flex:1; overflow-y:auto; padding:32px 40px 80px; }
+
+/* PAGE HEADER */
+.page-header { margin-bottom:40px; }
+.page-eyebrow { font-size:10px; font-weight:700; letter-spacing:0.25em; text-transform:uppercase;
+  color:var(--green); margin-bottom:10px; }
+.page-title { font-family:'Barlow Condensed',sans-serif; font-size:52px; font-weight:900;
+  text-transform:uppercase; line-height:1; margin-bottom:8px; }
+.page-title span { color:var(--green); }
+.page-sub { font-size:13px; color:var(--muted); line-height:1.7; max-width:460px; }
+
+/* PLANS GRID */
+.plans-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:56px; }
+@media(max-width:700px) { .plans-grid { grid-template-columns:1fr; } }
+
+.plan-card { background:var(--card); border:1px solid var(--border); border-radius:20px;
+  padding:28px; position:relative; display:flex; flex-direction:column; gap:0; transition:border-color .2s; }
+.plan-card.featured { border-color:var(--green);
+  background:linear-gradient(160deg,rgba(163,230,53,.05) 0%,var(--card) 60%); }
+
+.plan-badge { position:absolute; top:-1px; right:20px; font-family:'Barlow Condensed',sans-serif;
+  font-size:10px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase;
+  padding:4px 12px; border-radius:0 0 8px 8px; }
+.plan-badge.popular { background:var(--green); color:#000; }
+
+.plan-name { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700;
+  letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+.plan-price { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900;
+  line-height:1; margin-bottom:4px; }
+.plan-price span { font-size:20px; font-weight:400; color:var(--muted); }
+.plan-period { font-size:11px; color:var(--muted); margin-bottom:24px; }
+.plan-divider { height:1px; background:var(--border); margin:20px 0; }
+
+.plan-features { display:flex; flex-direction:column; gap:10px; flex:1; margin-bottom:28px; }
+.feature-row { display:flex; align-items:flex-start; gap:10px; font-size:13px; line-height:1.5; }
+.feature-check { flex-shrink:0; width:16px; height:16px; margin-top:1px; }
+.feature-check.yes { color:var(--green); }
+.feature-check.no  { color:var(--border); }
+.feature-text { color:var(--text); }
+.feature-text.muted { color:var(--muted); }
+
+.plan-cta { width:100%; padding:13px; border-radius:999px; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:0.08em; text-transform:uppercase; border:none; transition:all .15s; }
+.plan-cta.primary { background:var(--green); color:#000; }
+.plan-cta.primary:hover { background:#b0f040; }
+.plan-cta.secondary { background:transparent; border:1px solid var(--border); color:var(--muted); }
+.plan-cta.secondary:hover { border-color:var(--green); color:var(--green); }
+.plan-cta.current { background:rgba(255,255,255,0.05); color:var(--muted); cursor:default; opacity:.7; }
+
+/* COMPARE TABLE */
+.compare-section { margin-bottom:8px; }
+.compare-title { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:900;
+  text-transform:uppercase; margin-bottom:20px; }
+.compare-wrap { background:var(--card); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
+.compare-table { width:100%; border-collapse:collapse; }
+.compare-table th { font-size:10px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase;
+  color:var(--muted); padding:14px 18px; border-bottom:1px solid var(--border); text-align:left; }
+.compare-table th:not(:first-child) { text-align:center; width:110px; }
+.compare-table td { padding:12px 18px; border-bottom:1px solid rgba(51,51,51,0.5); font-size:13px; }
+.compare-table td:not(:first-child) { text-align:center; font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; }
+.compare-table tr:hover td { background:rgba(255,255,255,0.02); }
+.compare-table .group-head td { font-size:9px; font-weight:700; letter-spacing:0.2em;
+  text-transform:uppercase; color:var(--green); padding:14px 18px 6px; background:none; border-bottom:none; }
+.check-yes { color:var(--green); }
+.check-no  { color:var(--border); }
+
+.tier-col-free    { color:var(--muted) !important; }
+.tier-col-plus    { color:var(--blue) !important; }
+.tier-col-premium { color:var(--green) !important; }
+</style>
+</head>
+<body>
+<div id="app-sidebar"></div>
+<div class="app-shell">
+  <main class="main-content">
+    <div id="app-header" style="display:none"></div>
+
+    <div class="scroll-area">
+
+      <div class="page-header">
+        <div class="page-eyebrow" data-i18n="plans">Plans</div>
+        <div class="page-title">CHOOSE YOUR<br><span>PITWALL</span></div>
+        <p class="page-sub" id="pricing-sub"></p>
+      </div>
+
+      <!-- Plans -->
+      <div class="plans-grid" id="plans-grid"></div>
+
+      <!-- Compare table -->
+      <div class="compare-section">
+        <div class="compare-title">Full comparison</div>
+        <div class="compare-wrap">
+          <table class="compare-table" id="compare-table"></table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw ''
+renderSidebar('plans', 'main')
+renderTopbar('Plans', '', [
+  { label: 'Back to Dashboard', action: "location.href='main.html'", icon: 'back' }
+])
+I18n.apply()
+
+document.getElementById('pricing-sub').textContent =
+  I18n.lang === 'fr'
+    ? 'Choisissez le plan qui correspond à votre équipe. Pas de frais cachés.'
+    : 'Pick the plan that fits your team. No hidden fees, cancel anytime.'
+
+const PLANS = [
+  {
+    key:'free', name:I18n.t('free'), price:0, color:'var(--muted)',
+    features:{
+      en:['Up to 3 lineups per team','Live telemetry (basic fields)','Standings & session data','Race strategy calculator','Setup manager','Unlimited teams & events'],
+      fr:['Jusqu\'à 3 lineups par équipe','Télémétrie en direct (données de base)','Classements et session','Calculateur de stratégie','Gestionnaire de réglages','Équipes & événements illimités'],
+    },
+    locked:{
+      en:['Pit stop estimator','Live track map with car positions','Advanced telemetry fields (TC, ABS, regen…)','Discord bot integration'],
+      fr:['Estimateur arrêt au stand','Carte piste en temps réel','Champs télémetrie avancés (TC, ABS, regen…)','Intégration bot Discord'],
+    },
+    cta:'current', ctaLabel:{ en:'Current plan', fr:'Plan actuel' },
+  },
+  {
+    key:'plus', name:I18n.t('plus'), price:4.99, color:'var(--blue)',
+    badge:{ en:'⭐ Most popular', fr:'⭐ Le plus populaire' }, badgeCls:'popular',
+    features:{
+      en:['Everything in Free','Up to 20 lineups per team','Up to 100 connected clients','Pit stop estimator (time & fuel)','Live track map with all car positions','Advanced telemetry (TC, ABS, regen, tyre zones)','Team logo upload'],
+      fr:['Tout ce qui est dans Gratuit','Jusqu\'à 20 lineups','Jusqu\'à 100 clients connectés','Estimateur arrêt au stand','Carte piste complète','Télémétrie avancée (TC, ABS, regen, zones pneus)','Logo équipe personnalisé'],
+    },
+    locked:{ en:['Discord bot integration'], fr:['Intégration bot Discord'] },
+    cta:'primary', ctaLabel:{ en:'Upgrade to Plus', fr:'Passer à Plus' },
+  },
+  {
+    key:'premium', name:I18n.t('premium'), price:9.99, color:'var(--green)',
+    features:{
+      en:['Everything in Plus','Unlimited lineups','Unlimited connected clients','Discord bot integration (pit calls, gaps, flags)','Priority support','Early access to new features'],
+      fr:['Tout ce qui est dans Plus','Lineups illimités','Clients illimités','Bot Discord (arrêts, gaps, drapeaux)','Support prioritaire','Accès anticipé aux nouvelles fonctionnalités'],
+    },
+    locked:[],
+    cta:'secondary', ctaLabel:{ en:'Upgrade to Premium', fr:'Passer à Premium' },
+  },
+]
+
+const lang = I18n.lang
+
+function renderPlans() {
+  const grid = document.getElementById('plans-grid')
+  grid.innerHTML = PLANS.map(p => {
+    const feats = (p.features[lang]||p.features.en).map(f =>
+      `<div class="feature-row">
+        <svg class="feature-check yes" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+          <polyline points="5,8 7,10.5 11,6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="feature-text">${f}</span>
+      </div>`).join('')
+
+    const locked = (p.locked[lang]||p.locked.en||[]).map(f =>
+      `<div class="feature-row">
+        <svg class="feature-check no" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="5.5" y1="8" x2="10.5" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="feature-text muted">${f}</span>
+      </div>`).join('')
+
+    const priceHTML = p.price === 0
+      ? `<div class="plan-price" style="color:${p.color}">Free</div>`
+      : `<div class="plan-price" style="color:${p.color}">${p.price.toFixed(2)}<span>€</span></div>`
+
+    const badge = p.badge
+      ? `<div class="plan-badge ${p.badgeCls}">${p.badge[lang]||p.badge.en}</div>` : ''
+
+    const ctaClass = { primary:'primary', secondary:'secondary', current:'current' }[p.cta]
+    const ctaLabel = (p.ctaLabel[lang]||p.ctaLabel.en)
+
+    return `<div class="plan-card${p.key==='plus'?' featured':''}">
+      ${badge}
+      <div class="plan-name">${p.name}</div>
+      ${priceHTML}
+      <div class="plan-period">${p.price>0 ? I18n.t('monthly') : (lang==='fr'?'Toujours gratuit':'Always free')}</div>
+      <div class="plan-divider"></div>
+      <div class="plan-features">${feats}${locked}</div>
+      <button class="plan-cta ${ctaClass}" ${p.cta==='current'?'disabled':''} onclick="handlePlanCta('${p.key}')">
+        ${ctaLabel}
+      </button>
+    </div>`
+  }).join('')
+}
+
+function handlePlanCta(key) {
+  if (key==='free') return
+  const msg = lang==='fr'
+    ? `L'achat de l'abonnement ${key} sera bientôt disponible.`
+    : `${key.charAt(0).toUpperCase()+key.slice(1)} plan purchase coming soon.`
+  alert(msg)
+}
+
+const COMPARE_ROWS = [
+  { group:{ en:'Lineups & Clients', fr:'Lineups & Clients' } },
+  { label:{ en:'Lineups per team', fr:'Lineups par équipe' },   free:'3',  plus:'20', premium:'∞' },
+  { label:{ en:'Connected clients', fr:'Clients connectés' },   free:'20', plus:'100',premium:'∞' },
+  { group:{ en:'Live Data', fr:'Données en direct' } },
+  { label:{ en:'Basic telemetry',   fr:'Télémétrie de base' },  free:'✓',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Advanced telemetry',fr:'Télémétrie avancée' },  free:'—',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Standings',         fr:'Classements' },         free:'✓',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Live track map',    fr:'Carte piste live' },    free:'—',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Pit stop estimator',fr:'Estimateur pit stop' }, free:'—',  plus:'✓',  premium:'✓' },
+  { group:{ en:'Strategy Tools', fr:'Outils stratégie' } },
+  { label:{ en:'Strategy calculator',fr:'Calc. stratégie' },    free:'✓',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Setup manager',     fr:'Gestionnaire réglages'},free:'✓',  plus:'✓',  premium:'✓' },
+  { group:{ en:'Team & Extras', fr:'Équipe & Extras' } },
+  { label:{ en:'Team logo upload',  fr:'Logo équipe' },         free:'—',  plus:'✓',  premium:'✓' },
+  { label:{ en:'Discord bot',       fr:'Bot Discord' },         free:'—',  plus:'—',  premium:'✓' },
+  { label:{ en:'Priority support',  fr:'Support prioritaire' }, free:'—',  plus:'—',  premium:'✓' },
+  { label:{ en:'Early access',      fr:'Accès anticipé' },      free:'—',  plus:'—',  premium:'✓' },
+]
+
+function cellHTML(val) {
+  if (val==='✓') return `<span class="check-yes">✓</span>`
+  if (val==='—') return `<span class="check-no">—</span>`
+  return `<span>${val}</span>`
+}
+
+function renderCompare() {
+  const table = document.getElementById('compare-table')
+  const thead = `<thead><tr>
+    <th></th>
+    <th class="tier-col-free">${I18n.t('free')}</th>
+    <th class="tier-col-plus">${I18n.t('plus')}</th>
+    <th class="tier-col-premium">${I18n.t('premium')}</th>
+  </tr></thead>`
+
+  const rows = COMPARE_ROWS.map(row => {
+    if (row.group) return `<tr class="group-head"><td colspan="4">${row.group[lang]||row.group.en}</td></tr>`
+    const label = row.label[lang]||row.label.en
+    return `<tr><td>${label}</td><td>${cellHTML(row.free)}</td><td>${cellHTML(row.plus)}</td><td>${cellHTML(row.premium)}</td></tr>`
+  }).join('')
+
+  table.innerHTML = thead + `<tbody>${rows}</tbody>`
+}
+
+renderPlans()
+renderCompare()
+</script>
+</body>
+</html>

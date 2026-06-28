@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="pitwall.js"></script>
+<script src="sidebar.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#111111; --sidebar:#161616; --card:#1c1c1c; --card-hover:#242424;
+  --surface:#1a1a1a; --green:#A3E635; --text:#FFFFFF; --muted:#A1A1AA;
+  --border:#333333; --red:#EF4444; --orange:#D97706; --lime:#A3E635;
+}
+html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--text);
+  font-family:'Barlow',sans-serif; -webkit-font-smoothing:antialiased; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#555; }
+
+.app-shell { display:flex; height:100vh; overflow:hidden; }
+
+/* SIDEBAR */
+.sidebar { width:240px; flex-shrink:0; background:var(--sidebar);
+  border-right:1px solid var(--border); display:flex; flex-direction:column;
+  justify-content:space-between; z-index:20; }
+.sidebar-logo { padding:24px; }
+.sidebar-logo h1 { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:900;
+  font-style:italic; letter-spacing:-0.02em; background:linear-gradient(to right,#A3E635,#4ADE80);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1; }
+.sidebar-logo p { font-size:10px; color:var(--muted); font-weight:500; text-align:right; margin-top:4px; }
+.sidebar-nav { padding:0 16px; display:flex; flex-direction:column; gap:6px; }
+.nav-link { display:flex; align-items:center; gap:12px; padding:10px 16px; border-radius:12px;
+  font-size:14px; font-weight:500; color:var(--muted); text-decoration:none; transition:all 0.2s;
+  cursor:pointer; border:none; background:none; width:100%; text-align:left; }
+.nav-link:hover { color:var(--text); background:rgba(255,255,255,0.05); }
+.nav-link.active { background:rgba(163,230,53,0.1); color:var(--green);
+  border:1px solid rgba(163,230,53,0.3); box-shadow:0 0 15px -3px rgba(163,230,53,0.4); }
+.nav-link svg { flex-shrink:0; }
+.sidebar-bottom { padding:16px; border-top:1px solid var(--border); }
+
+/* MAIN */
+.main-content { flex:1; display:flex; flex-direction:column; height:100%; overflow:hidden; }
+
+/* SCROLL */
+.scroll-area { flex:1; overflow-y:auto; padding:32px 40px 80px; }
+
+/* PAGE HEADER */
+.page-header { margin-bottom:32px; }
+.page-title { font-family:'Barlow Condensed',sans-serif; font-size:42px; font-weight:900;
+  text-transform:uppercase; letter-spacing:0.02em; line-height:1; }
+.page-sub { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.5; }
+
+/* GRID */
+.settings-two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+@media(max-width:780px) { .settings-two-col { grid-template-columns:1fr; } }
+
+/* SECTION CARD */
+.s-card { background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:24px; margin-bottom:16px; }
+.s-card.danger-card { border-color:rgba(239,68,68,0.2); margin-bottom:0; }
+
+.s-section-title { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.2em; color:var(--green);
+  margin-bottom:18px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.danger-card .s-section-title { color:var(--red); border-bottom-color:rgba(239,68,68,0.2); }
+.s-section-desc { font-size:12px; color:var(--muted); margin-bottom:16px; line-height:1.6; }
+
+/* PROFILE */
+.profile-avatar-row { display:flex; align-items:center; gap:14px; margin-bottom:20px;
+  padding:14px; background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid var(--border); }
+.profile-avatar { width:48px; height:48px; border-radius:50%; object-fit:cover;
+  background:var(--border); flex-shrink:0; }
+.profile-steam-name { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; }
+.profile-steam-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* RENAME */
+.rename-row { display:flex; gap:10px; align-items:flex-end; }
+.rename-row .form-group { flex:1; margin-bottom:0; }
+.rename-cooldown { font-size:11px; color:var(--muted); margin-top:8px; }
+.rename-cooldown .cd-active { color:var(--orange); }
+.save-row { margin-top:12px; display:flex; gap:10px; align-items:center; min-height:18px; }
+.save-ok  { font-size:12px; color:var(--green); opacity:0; transition:opacity .3s; }
+.save-ok.show  { opacity:1; }
+.save-err { font-size:12px; color:var(--red); opacity:0; transition:opacity .3s; }
+.save-err.show { opacity:1; }
+
+/* FORM */
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.1em; color:var(--muted); margin-bottom:7px; }
+.form-input { width:100%; padding:11px 14px; background:#111; border:1px solid var(--border);
+  border-radius:10px; color:var(--text); font-family:'Barlow',sans-serif; font-size:14px;
+  transition:border-color .2s; }
+.form-input:focus { outline:none; border-color:var(--green); box-shadow:0 0 0 2px rgba(163,230,53,0.12); }
+
+/* BUTTONS */
+.btn { padding:10px 20px; border-radius:999px; font-family:'Barlow',sans-serif;
+  font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+  cursor:pointer; transition:all .2s; border:none; }
+.btn-primary { background:var(--green); color:#000; }
+.btn-primary:hover { background:#b0f040; }
+.btn-primary:disabled { opacity:.4; cursor:default; }
+.btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-ghost:hover { color:var(--text); border-color:var(--text); }
+.btn-danger { background:transparent; color:var(--red); border:1px solid rgba(239,68,68,0.4);
+  padding:10px 20px; border-radius:999px; font-family:'Barlow',sans-serif; font-size:13px;
+  font-weight:700; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; transition:all .2s; }
+.btn-danger:hover { background:rgba(239,68,68,0.1); border-color:var(--red); }
+
+/* DND BANNER */
+.dnd-banner { display:flex; align-items:center; gap:10px; padding:10px 14px;
+  background:rgba(217,119,6,0.08); border:1px solid rgba(217,119,6,0.25); border-radius:10px;
+  margin-bottom:14px; }
+.dnd-banner-icon { font-size:16px; flex-shrink:0; }
+.dnd-banner-label { font-family:'Barlow Condensed',sans-serif; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.08em; font-size:12px; color:var(--orange); }
+.dnd-banner-text { font-size:11px; color:var(--orange); margin-top:1px; line-height:1.4; opacity:.8; }
+
+/* TOGGLE */
+.toggle-row { display:flex; align-items:center; justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid rgba(51,51,51,0.6); }
+.toggle-row:last-child { border-bottom:none; }
+.toggle-label { font-size:13px; color:var(--text); font-weight:500; }
+.toggle-sub { font-size:11px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.toggle-wrap { position:relative; width:40px; height:22px; flex-shrink:0; }
+.toggle-wrap input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:#333; border-radius:22px; cursor:pointer; transition:background .2s; }
+.toggle-slider::before { content:''; position:absolute; width:16px; height:16px; left:3px; bottom:3px;
+  background:var(--muted); border-radius:50%; transition:.2s; }
+.toggle-wrap input:checked + .toggle-slider { background:rgba(163,230,53,0.3); }
+.toggle-wrap input:checked + .toggle-slider::before { transform:translateX(18px); background:var(--green); }
+
+/* VOLUME */
+.volume-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid rgba(51,51,51,0.6); }
+.volume-row:last-child { border-bottom:none; }
+.volume-label { font-size:13px; color:var(--text); font-weight:500; flex-shrink:0; width:80px; }
+.volume-slider { flex:1; -webkit-appearance:none; appearance:none; height:4px;
+  background:var(--border); border-radius:2px; outline:none; }
+.volume-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
+  border-radius:50%; background:var(--green); cursor:pointer; }
+.volume-val { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+  color:var(--muted); min-width:36px; text-align:right; }
+.volume-test { background:none; border:1px solid var(--border); color:var(--muted); border-radius:8px;
+  padding:5px 12px; font-size:11px; cursor:pointer; font-family:'Barlow Condensed',sans-serif;
+  font-weight:600; letter-spacing:0.06em; text-transform:uppercase; transition:all .15s; }
+.volume-test:hover { border-color:var(--green); color:var(--green); }
+
+/* LANG GRID */
+.lang-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; }
+.lang-card { display:flex; align-items:center; gap:10px; padding:10px 12px;
+  background:#111; border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all .15s; }
+.lang-card:hover { border-color:var(--muted); background:rgba(255,255,255,0.03); }
+.lang-card.active { border-color:var(--green); background:rgba(163,230,53,0.06); }
+.lang-card-flag { width:22px; height:16px; object-fit:cover; border-radius:2px; background:var(--border); flex-shrink:0; }
+.lang-card-name { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600;
+  color:var(--text); text-transform:uppercase; letter-spacing:0.06em; }
+.lang-card.active .lang-card-name { color:var(--green); }
+.lang-card-code { font-size:10px; color:var(--muted); }
+
+/* FOLDER */
+.folder-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.folder-path { flex:1; background:#111; border:1px solid var(--border); border-radius:10px;
+  color:var(--muted); font-family:'Barlow',sans-serif; font-size:12px; padding:10px 13px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:38px; display:flex; align-items:center; }
+.folder-path.has-value { color:var(--text); }
+.folder-clear { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px;
+  padding:6px 8px; transition:color .15s; border-radius:6px; }
+.folder-clear:hover { color:var(--red); background:rgba(239,68,68,0.08); }
+.folder-hint { font-size:11px; color:var(--muted); margin-bottom:16px; line-height:1.5; }
+
+/* DANGER */
+.danger-text { font-size:12px; color:var(--muted); margin-bottom:18px; line-height:1.6; }
+.danger-confirm { display:none; margin-top:16px; padding:16px;
+  background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); border-radius:12px; }
+.danger-confirm.show { display:block; }
+.danger-confirm p { font-size:12px; color:var(--red); margin-bottom:12px; line-height:1.5; }
+.danger-confirm-input { width:100%; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<div id="app-sidebar"></div>
+<div class="app-shell">
+
+  <main class="main-content">
+    <div id="app-header" style="display:none"></div>
+
+    <div class="scroll-area">
+      <div class="page-header">
+        <div class="page-title" data-i18n="settings">Settings</div>
+        <div class="page-sub" data-i18n="settingsSub">Manage your display name, language, local folders and account</div>
+      </div>
+
+      <div class="settings-two-col">
+        <!-- Display Name -->
+        <div class="s-card" style="margin-bottom:0">
+          <div class="s-section-title" data-i18n="displayNameSection">Display Name</div>
+          <div class="profile-avatar-row" id="profile-avatar-row"></div>
+          <div class="rename-row">
+            <div class="form-group">
+              <div class="form-label" data-i18n="displayName">Display Name</div>
+              <input class="form-input" id="s-displayname" type="text" placeholder="Driver Name" maxlength="24">
+            </div>
+            <button class="btn btn-primary" id="btn-rename" onclick="saveDisplayName()" data-i18n="save">Save</button>
+          </div>
+          <div class="rename-cooldown" id="rename-cooldown"></div>
+          <div class="save-row">
+            <div class="save-ok" id="rename-ok"></div>
+            <div class="save-err" id="rename-err"></div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="s-card" style="margin-bottom:0">
+          <div class="s-section-title" data-i18n="notificationsSection">Notifications</div>
+          <div class="dnd-banner" id="dnd-banner" style="display:none">
+            <div class="dnd-banner-icon">🔇</div>
+            <div>
+              <div class="dnd-banner-label" data-i18n="dndActive">Do Not Disturb</div>
+              <div class="dnd-banner-text" id="dnd-banner-text" data-i18n="dndAutoDesc">Automatically enabled while driving</div>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="doNotDisturb">Do Not Disturb</div>
+            <div class="toggle-sub" data-i18n="dndSub">Mute all sounds and system notifications.</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-dnd" onchange="toggleDND()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="volume-row">
+            <div class="volume-label" data-i18n="notifVolume">Volume</div>
+            <input type="range" class="volume-slider" id="notif-volume" min="0" max="100" value="50" oninput="updateVolume(this.value)">
+            <div class="volume-val" id="volume-val">50%</div>
+            <button class="volume-test" onclick="testSound()" data-i18n="test">Test</button>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="positionChange">Position change</div>
+            <div class="toggle-sub" data-i18n="positionChangeSub">Alert when your position changes (not in pits)</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-position_change" onchange="saveNotifPrefs()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="pitStop">Pit stop</div>
+            <div class="toggle-sub" data-i18n="pitStopSub">Alert when a car enters or exits the pits</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-pit_stop" onchange="saveNotifPrefs()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="weatherChange">Weather change</div>
+            <div class="toggle-sub" data-i18n="weatherChangeSub">Alert when rain starts or stops</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-weather" onchange="saveNotifPrefs()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="crash">Crash / incident</div>
+            <div class="toggle-sub" data-i18n="crashSub">Alert on detected track incidents</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-crash" onchange="saveNotifPrefs()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label" data-i18n="stintPlanUpdate">Stint plan update</div>
+            <div class="toggle-sub" data-i18n="stintPlanUpdateSub">Alert when strategy recommendation changes</div></div>
+            <label class="toggle-wrap"><input type="checkbox" id="notif-stint_plan" onchange="saveNotifPrefs()"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Language -->
+      <div class="s-card">
+        <div class="s-section-title" data-i18n="languageSection">Language</div>
+        <div class="s-section-desc" data-i18n="languageDesc">Choose your interface language. You can contribute translations by editing translations.json.</div>
+        <div class="lang-grid" id="lang-grid"></div>
+      </div>
+
+      <!-- Local Folders -->
+      <div class="s-card">
+        <div class="s-section-title" data-i18n="localFolders">Local Folders</div>
+        <div class="s-section-desc" data-i18n="localFoldersDesc">Assign local folders for MoTeC data import/export and LMU car setups.</div>
+        <div class="form-label" data-i18n="motecFolder">MoTeC Data Folder</div>
+        <div class="folder-row">
+          <div class="folder-path" id="motec-path">No folder selected</div>
+          <button class="btn btn-ghost" onclick="pickFolder('motec')" data-i18n="browse">Browse</button>
+          <button class="folder-clear" onclick="clearFolder('motec')" title="Clear">✕</button>
+        </div>
+        <div class="folder-hint" data-i18n="motecHint">Folder where MoTeC .ld/.ldx files are stored for import and export.</div>
+        <div class="form-label" data-i18n="setupFolder">LMU Setup Folder</div>
+        <div class="folder-row">
+          <div class="folder-path" id="setup-path">No folder selected</div>
+          <button class="btn btn-ghost" onclick="pickFolder('setup')" data-i18n="browse">Browse</button>
+          <button class="folder-clear" onclick="clearFolder('setup')" title="Clear">✕</button>
+        </div>
+        <div class="folder-hint" id="setup-hint"></div>
+        <div class="save-row" style="margin-top:4px"><div class="save-ok" id="folder-ok"></div></div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="s-card danger-card">
+        <div class="s-section-title" data-i18n="dangerZone">Danger Zone</div>
+        <div class="danger-text" data-i18n="deleteAccountDesc">Permanently delete your Pitwall account and all associated data. This action cannot be undone.</div>
+        <button class="btn-danger" id="btn-delete-account" onclick="showDeleteConfirm()" data-i18n="deleteAccount">Delete Account</button>
+        <div class="danger-confirm" id="delete-confirm">
+          <p data-i18n="deleteConfirmText">Type DELETE to confirm permanent account deletion:</p>
+          <input class="form-input danger-confirm-input" id="delete-input" type="text" placeholder="DELETE" autocomplete="off">
+          <div style="display:flex;gap:8px">
+            <button class="btn-danger" onclick="confirmDelete()" data-i18n="deleteAccountConfirm">Delete my account</button>
+            <button class="btn btn-ghost" onclick="hideDeleteConfirm()" data-i18n="cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw ''
+
+const LANG_FLAGS = {
+  en:'gb',fr:'fr',de:'de',es:'es',no:'no',it:'it',pt:'pt',nl:'nl',pl:'pl',sv:'se',
+  da:'dk',fi:'fi',ja:'jp',ko:'kr',zh:'cn',ru:'ru',tr:'tr',cs:'cz',hu:'hu',ro:'ro',
+  uk:'ua',ar:'sa',hi:'in',th:'th',vi:'vn',el:'gr',hr:'hr',sk:'sk',bg:'bg',sl:'si',
+  et:'ee',lv:'lv',lt:'lt',ms:'my',id:'id',
+}
+const LANG_NAMES = {
+  en:'English',fr:'Francais',de:'Deutsch',es:'Espanol',no:'Norsk',it:'Italiano',
+  pt:'Portugues',nl:'Nederlands',pl:'Polski',sv:'Svenska',da:'Dansk',fi:'Suomi',
+  ja:'Japanese',ko:'Korean',zh:'Chinese',ru:'Russian',tr:'Turkce',cs:'Cestina',
+  hu:'Magyar',ro:'Romana',uk:'Ukrainian',ar:'Arabic',hi:'Hindi',th:'Thai',
+  vi:'Vietnamese',el:'Greek',hr:'Hrvatski',sk:'Slovak',bg:'Bulgarian',sl:'Slovenian',
+  et:'Estonian',lv:'Latvian',lt:'Lithuanian',ms:'Malay',id:'Indonesian',
+}
+const LMU_SETUP_BASE = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\player\\Settings'
+const SETTINGS_KEY = 'pw_settings'
+function getSettings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}') } catch { return {} } }
+function saveSettings(patch) { const s={...getSettings(),...patch}; localStorage.setItem(SETTINGS_KEY,JSON.stringify(s)); return s }
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const data = await Auth.getUser()
+  if (!data) { Auth.logout(); return }
+  const { user } = data
+  
+  renderSidebar('settings', 'main')
+  renderTopbar('Settings', '', [
+    { label: 'Upgrade', action: "location.href='main-subscription.html'", icon: 'plans' },
+    { label: 'Sign out', action: "Auth.logout()", icon: 'back' }
+  ])
+  
+  I18n.apply()
+  const avatarRow = document.getElementById('profile-avatar-row')
+  avatarRow.innerHTML = `
+    ${user.steam_avatar ? `<img class="profile-avatar" src="${esc(user.steam_avatar)}" alt="">` : ''}
+    <div>
+      <div class="profile-steam-name">${esc(user.display_name || user.steam_name)}</div>
+      <div class="profile-steam-sub">Steam — ${esc(user.steam_name)}</div>
+    </div>`
+  document.getElementById('s-displayname').value = user.display_name || user.steam_name || ''
+  updateRenameCooldown(user)
+  const prefs = Notifications.getPrefs()
+  ;['position_change','pit_stop','weather','crash','stint_plan'].forEach(key => {
+    const el = document.getElementById(`notif-${key}`)
+    if (el) el.checked = !!prefs[key]
+  })
+  document.getElementById('notif-dnd').checked = Notifications.manualDND
+  updateDNDBanner()
+  const vol = Math.round(Notifications.volume * 100)
+  document.getElementById('notif-volume').value = vol
+  document.getElementById('volume-val').textContent = vol + '%'
+  renderLangGrid()
+  const settings = getSettings()
+  updateFolderDisplay('motec', settings.motec_folder)
+  updateFolderDisplay('setup', settings.setup_folder)
+  document.getElementById('setup-hint').innerHTML =
+    `${I18n.t('setupHint')||'Default LMU path:'} <span style="color:var(--text);font-family:monospace;font-size:10px">${esc(LMU_SETUP_BASE)}</span>`
+})
+
+function updateRenameCooldown(user) {
+  const el = document.getElementById('rename-cooldown')
+  if (!user.last_rename) { el.textContent = I18n.t('renameAvailable')||'You can change your display name.'; document.getElementById('btn-rename').disabled = false; return }
+  const lastRename = new Date(user.last_rename)
+  const nextAllowed = new Date(lastRename.getTime() + 7*24*60*60*1000)
+  const now = new Date()
+  if (now >= nextAllowed) { el.textContent = I18n.t('renameAvailable')||'You can change your display name.'; document.getElementById('btn-rename').disabled = false }
+  else {
+    const days = Math.ceil((nextAllowed-now)/(24*60*60*1000))
+    el.innerHTML = `<span class="cd-active">${I18n.t('renameCooldown')||'Next rename available in'} ${days} ${I18n.t('days')||'days'}</span>`
+    document.getElementById('btn-rename').disabled = true
+    document.getElementById('btn-rename').style.opacity = '.4'
+  }
+}
+
+async function saveDisplayName() {
+  const name = document.getElementById('s-displayname').value.trim()
+  if (!name||name.length<2) { flashMsg('rename-err', I18n.t('nameTooShort')||'Name must be at least 2 characters'); return }
+  if (name.length>24) { flashMsg('rename-err', I18n.t('nameTooLong')||'Name must be 24 characters or less'); return }
+  try {
+    const res = await fetch(`${API}/auth/rename`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token: Auth.getToken(), display_name: name })
+    })
+    const result = await res.json()
+    if (!res.ok) { flashMsg('rename-err', result.error||'Failed to rename'); return }
+    flashMsg('rename-ok', I18n.t('renameSaved')||'Display name updated!')
+    updateRenameCooldown(result.user||{ last_rename: new Date().toISOString() })
+  } catch(e) { flashMsg('rename-err','Network error') }
+}
+
+function flashMsg(id, text) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.textContent = text; el.classList.add('show')
+  setTimeout(() => el.classList.remove('show'), 3000)
+}
+
+function renderLangGrid() {
+  const grid = document.getElementById('lang-grid')
+  const langs = I18n.availableLangs
+  grid.innerHTML = langs.map(code => {
+    const active = I18n.lang===code ? ' active' : ''
+    return `<div class="lang-card${active}" onclick="switchLang('${esc(code)}')">
+      <img class="lang-card-flag" src="assets/flags/${esc(LANG_FLAGS[code]||code)}.svg" alt="${esc(code)}" onerror="this.style.display='none'">
+      <div><div class="lang-card-name">${esc(LANG_NAMES[code]||code.toUpperCase())}</div><div class="lang-card-code">${esc(code)}</div></div>
+    </div>`
+  }).join('')
+}
+
+function switchLang(code) { if (I18n.lang===code) return; setLang(code) }
+
+function updateFolderDisplay(type, path) {
+  const el = document.getElementById(`${type}-path`)
+  if (!el) return
+  if (path) { el.textContent = path; el.classList.add('has-value') }
+  else { el.textContent = I18n.t('noFolderSelected')||'No folder selected'; el.classList.remove('has-value') }
+}
+
+async function pickFolder(type) {
+  if (window.electronAPI?.openFolder) {
+    const fp = await window.electronAPI.openFolder()
+    if (!fp) return
+    saveSettings({ [`${type}_folder`]: fp }); updateFolderDisplay(type,fp); flashMsg('folder-ok','✓ '+(I18n.t('folderSaved')||'Folder saved'))
+  } else {
+    const path = prompt(I18n.t('enterFolderPath')||'Enter folder path:')
+    if (!path) return
+    saveSettings({ [`${type}_folder`]: path }); updateFolderDisplay(type,path); flashMsg('folder-ok','✓ '+(I18n.t('folderSaved')||'Folder saved'))
+  }
+}
+
+function clearFolder(type) { saveSettings({ [`${type}_folder`]: null }); updateFolderDisplay(type,null) }
+
+function saveNotifPrefs() {
+  const prefs = {}
+  ;['position_change','pit_stop','weather','crash','stint_plan'].forEach(key => {
+    const el = document.getElementById(`notif-${key}`); if (el) prefs[key] = el.checked
+  })
+  Notifications.setPrefs(prefs)
+}
+
+function toggleDND() { const on = document.getElementById('notif-dnd').checked; Notifications.setDND(on); updateDNDBanner() }
+
+function updateDNDBanner() {
+  const banner = document.getElementById('dnd-banner')
+  const isDND = Notifications.isDND; const isManual = Notifications.manualDND
+  banner.style.display = isDND ? 'flex' : 'none'
+  if (isDND&&!isManual) document.getElementById('dnd-banner-text').textContent = I18n.t('dndAutoDesc')||'Automatically enabled while driving'
+  else if (isDND) document.getElementById('dnd-banner-text').textContent = I18n.t('dndManualDesc')||'Manually enabled — sounds and system notifications are muted'
+}
+
+function updateVolume(val) { const v=parseInt(val,10); document.getElementById('volume-val').textContent=v+'%'; Notifications.setVolume(v/100) }
+function testSound() { const a=new Audio('assets/sounds/notifs/position_change.mp3'); a.volume=Notifications.volume; a.play().catch(()=>{}) }
+
+function showDeleteConfirm() { document.getElementById('delete-confirm').classList.add('show'); document.getElementById('btn-delete-account').style.display='none' }
+function hideDeleteConfirm() { document.getElementById('delete-confirm').classList.remove('show'); document.getElementById('btn-delete-account').style.display=''; document.getElementById('delete-input').value='' }
+
+async function confirmDelete() {
+  const input = document.getElementById('delete-input').value.trim()
+  if (input!=='DELETE') { document.getElementById('delete-input').style.borderColor='var(--red)'; setTimeout(()=>{ document.getElementById('delete-input').style.borderColor='' },1500); return }
+  try {
+    const res = await fetch(`${API}/auth/delete-account`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token: Auth.getToken() }) })
+    if (res.ok) { localStorage.clear(); sessionStorage.clear(); location.href='index.html' }
+    else { const r=await res.json(); alert(r.error||'Failed to delete account') }
+  } catch(e) { alert('Network error — could not delete account') }
+}
+</script>
+</body>
+</html>

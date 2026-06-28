@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Timing — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<style>
+.pitwall-layout {
+  display: grid; grid-template-columns: 300px 1fr;
+  grid-template-rows: 44px 1fr 32px;
+  height: calc(100vh - 48px);
+}
+/* Session bar */
+.session-bar {
+  grid-column: 1/-1; display: flex; align-items: center;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 16px; overflow: hidden;
+}
+.session-item { display: flex; flex-direction: column; justify-content: center;
+  padding: 0 16px; border-right: 1px solid var(--border); min-width: 90px; }
+.session-item:first-child { padding-left: 0; }
+.skey { font-size: 8px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); }
+.sval { font-family: 'Barlow Condensed',sans-serif; font-size: 16px; font-weight: 700; }
+.sval.lime { color: var(--lime); }
+.flag-ind { margin-left: auto; padding-left: 16px; font-family: 'Barlow Condensed',sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px; }
+.flag-icon {
+  display: inline-block; width: 24px; height: 14px; border-radius: 2px; vertical-align: middle;
+}
+.flag-icon.f-green  { background: #22c55e; }
+.flag-icon.f-yellow { background: #facc15; }
+.flag-icon.f-blue   { background: #3b8fff; }
+.flag-icon.f-white  { background: #e5e5e5; }
+.flag-icon.f-checkered {
+  background: repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50%/8px 8px;
+}
+
+/* Driver panel */
+.panel-driver { border-right: 1px solid var(--border); padding: 16px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px; }
+.driver-header { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.driver-pos { font-family: 'Barlow Condensed',sans-serif; font-size: 44px; font-weight: 900;
+  line-height: 1; color: var(--lime); min-width: 52px; text-align: center; }
+.driver-name { font-family: 'Barlow Condensed',sans-serif; font-size: 18px; font-weight: 700; text-transform: uppercase; }
+.driver-car  { font-size: 11px; color: var(--muted); }
+
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.metric { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 10px 12px; }
+.metric.wide { grid-column: 1/-1; }
+.mkey { font-size: 8px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.mval { font-family: 'Barlow Condensed',sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
+.munit { font-size: 11px; color: var(--muted); margin-left: 2px; }
+
+.ve-bar-wrap { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.ve-bar { height: 100%; background: var(--lime); border-radius: 3px; transition: width .5s, background .3s; }
+
+.tyre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.tyre-corner { background: var(--card); border-radius: 2px; padding: 7px 9px;
+  border-left: 3px solid var(--border); transition: border-color .3s; }
+.tyre-label { font-size: 8px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+.tyre-temp  { font-family: 'Barlow Condensed',sans-serif; font-size: 18px; font-weight: 700; }
+.tyre-wear  { font-size: 10px; color: var(--muted); }
+
+.gap-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 3px;
+  padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+.gap-side { text-align: center; }
+.gap-label { font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.gap-val   { font-family: 'Barlow Condensed',sans-serif; font-size: 20px; font-weight: 700; }
+.gap-div   { width: 1px; height: 28px; background: var(--border); }
+
+.indicators { display: flex; gap: 6px; flex-wrap: wrap; }
+.ind { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 2px; background: var(--border); color: var(--muted); transition: background .2s, color .2s; }
+.ind.on-abs { background: rgba(59,143,255,.2); color: var(--blue); }
+.ind.on-tc  { background: rgba(255,140,0,.2);  color: var(--orange); }
+.ind.on-pit { background: rgba(200,255,0,.2);  color: var(--lime); }
+.ind.on-inv { background: rgba(255,59,59,.2);  color: var(--red); }
+
+/* ── Standings panel ── */
+.panel-standings { overflow: hidden; display: flex; flex-direction: column; }
+
+/* Category filter */
+.cat-filter {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cat-filter-label { font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.cat-btn {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 3px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; transition: all .15s;
+}
+.cat-btn.active { border-color: currentColor; }
+
+/* Lap mode selector */
+.lap-mode-wrap { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.lap-mode-btn {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 2px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; transition: all .15s;
+}
+.lap-mode-btn.active { color: var(--lime); border-color: var(--lime); background: rgba(200,255,0,.08); }
+
+/* Standings grid */
+.st-cols {
+  grid-template-columns:
+    36px                       /* Pos */
+    30px                       /* Cat */
+    1fr                        /* Driver — fills remaining width */
+    58px 58px 58px             /* S1 S2 S3 */
+    72px                       /* Last */
+    56px                       /* Delta */
+    64px 64px                  /* Gap Int */
+    40px                       /* VE% */
+    46px                       /* VE/L */
+    42px;                      /* Status */
+}
+.standings-head {
+  display: grid; padding: 6px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10; align-items: center;
+}
+.col-h { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.col-r { text-align: right; }
+.col-c { text-align: center; }
+
+/* Row */
+.standing-row {
+  display: grid; padding: 12px 14px; border-bottom: 1px solid rgba(34,34,34,.6); align-items: center;
+  transition: background .1s; border-left: 4px solid transparent;
+}
+.standing-row:hover { background: rgba(255,255,255,.02); }
+.standing-row.player { background: rgba(200,255,0,.04); }
+.standing-row.in-pits .col-name-p,
+.standing-row.in-pits .col-sector,
+.standing-row.in-pits .col-lap { opacity: .4; }
+.standing-row.filtered-out { display: none; }
+
+.col-pos {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 20px; font-weight: 900;
+  line-height: 1; color: #ccc;
+}
+.col-cat {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 15px; font-weight: 800;
+  text-align: center; line-height: 1;
+}
+.col-name-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.col-brand { height: 18px; width: 22px; object-fit: contain; opacity: .7; flex-shrink: 0; }
+.col-name-p {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 16px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.col-name-s {
+  font-size: 10px; color: #888;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.col-sector {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 14px; text-align: right; color: #ddd;
+}
+.col-sector.pb { color: #a855f7; }
+.col-lap {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 15px; text-align: right;
+}
+.col-delta {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 12px; text-align: right;
+}
+.col-delta.faster { color: #22c55e; }
+.col-delta.slower { color: #999; }
+.col-gap {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 13px; text-align: right; color: #aaa;
+}
+.col-ve {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 12px; font-weight: 700;
+  text-align: right;
+}
+.col-vel {
+  font-family: 'Barlow Condensed',sans-serif; font-size: 12px; text-align: right; color: #aaa;
+}
+.col-status {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; text-align: center;
+}
+.badge-pit { color: var(--lime); }
+.badge-yellow { color: #facc15; }
+
+/* Player sticky footer */
+.player-sticky {
+  display: none; border-top: 2px solid var(--lime);
+  background: rgba(200,255,0,.06); flex-shrink: 0;
+}
+.player-sticky.visible { display: block; }
+.player-sticky .standing-row { border-bottom: none; background: transparent; }
+
+/* Status bar */
+.status-bar {
+  grid-column: 1/-1; display: flex; align-items: center; gap: 8px;
+  padding: 0 16px; background: var(--black); border-top: 1px solid var(--border);
+  font-size: 10px; color: var(--muted);
+}
+.sdot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.sdot.ok { background: var(--lime); }
+.sdot.err { background: var(--red); }
+
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="pitwall-layout">
+
+  <!-- Session bar -->
+  <div class="session-bar">
+    <img id="s-track-logo" src="assets/tracks/logos/Circuit=Default.svg" alt="" style="height:26px;width:auto;margin-right:6px;opacity:.8">
+    <div class="session-item"><div class="skey">Track</div><div class="sval" id="s-track">—</div></div>
+    <div class="session-item"><div class="skey">Session</div><div class="sval" id="s-session">—</div></div>
+    <div class="session-item"><div class="skey">Remaining</div><div class="sval lime" id="s-time">—</div></div>
+    <div class="session-item"><div class="skey">Lap</div><div class="sval" id="s-lap">—</div></div>
+    <div class="session-item"><div class="skey">Track</div><div class="sval" id="s-ttemp">—</div></div>
+    <div class="session-item"><div class="skey">Air</div><div class="sval" id="s-atemp">—</div></div>
+    <div class="session-item"><div class="skey">Rain</div><div class="sval" id="s-rain">Dry</div></div>
+    <div class="session-item"><div class="skey">Grip</div><div class="sval" id="s-grip">—</div></div>
+    <div class="session-item"><div class="skey">Cars</div><div class="sval" id="s-cars">—</div></div>
+    <div class="flag-ind" id="s-flag"></div>
+  </div>
+
+  <!-- Driver panel -->
+  <div class="panel-driver">
+    <div class="driver-header">
+      <div class="driver-pos" id="d-pos">—</div>
+      <div><div class="driver-name" id="d-name">—</div><div class="driver-car" id="d-car">—</div></div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="mkey">Speed</div><div class="mval" id="d-speed">0<span class="munit">km/h</span></div></div>
+      <div class="metric"><div class="mkey">Gear</div><div class="mval" id="d-gear">N</div></div>
+      <div class="metric"><div class="mkey">Fuel</div><div class="mval" id="d-fuel">—<span class="munit">L</span></div></div>
+      <div class="metric wide">
+        <div class="mkey">Virtual Energy</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <div class="mval lime" id="d-ve">—<span class="munit">%</span></div>
+          <div class="ve-bar-wrap"><div class="ve-bar" id="d-ve-bar"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div class="mkey" style="display:flex;align-items:center;gap:8px">Tyres <span id="d-compound" style="color:var(--lime);font-size:9px;letter-spacing:.05em"></span>
+        <span id="tyre-temp-toggle" onclick="toggleTyreTemp()" style="margin-left:auto;cursor:pointer;font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:2px 6px;border:1px solid var(--border);border-radius:3px">SURFACE</span>
+      </div>
+      <div class="tyre-grid">
+        <div class="tyre-corner" id="tc-fl"><div class="tyre-label">FL</div><div class="tyre-temp" id="tt-fl">—°</div><div class="tyre-wear" id="tw-fl">—%</div></div>
+        <div class="tyre-corner" id="tc-fr"><div class="tyre-label">FR</div><div class="tyre-temp" id="tt-fr">—°</div><div class="tyre-wear" id="tw-fr">—%</div></div>
+        <div class="tyre-corner" id="tc-rl"><div class="tyre-label">RL</div><div class="tyre-temp" id="tt-rl">—°</div><div class="tyre-wear" id="tw-rl">—%</div></div>
+        <div class="tyre-corner" id="tc-rr"><div class="tyre-label">RR</div><div class="tyre-temp" id="tt-rr">—°</div><div class="tyre-wear" id="tw-rr">—%</div></div>
+      </div>
+    </div>
+    <div class="gap-bar">
+      <div class="gap-side"><div class="gap-label">↑ Ahead</div><div class="gap-val lime" id="d-ahead">—</div></div>
+      <div class="gap-div"></div>
+      <div class="gap-side"><div class="gap-label">Behind ↓</div><div class="gap-val" id="d-behind">—</div></div>
+    </div>
+    <div class="indicators">
+      <div class="ind" id="i-abs">ABS</div>
+      <div class="ind" id="i-tc">TC</div>
+      <div class="ind" id="i-pit">PITS</div>
+      <div class="ind" id="i-lim">LIMITER</div>
+      <div class="ind" id="i-inv">INVALID</div>
+    </div>
+  </div>
+
+  <!-- Standings -->
+  <div class="panel-standings">
+    <!-- Category filter + Lap mode -->
+    <div class="cat-filter">
+      <span class="cat-filter-label">Class</span>
+      <div id="cat-btns" style="display:flex;gap:5px"></div>
+      <div class="lap-mode-wrap">
+        <span class="cat-filter-label" style="margin-right:2px">Mode</span>
+        <button class="lap-mode-btn active" data-mode="last" onclick="setLapMode('last')">Last</button>
+        <button class="lap-mode-btn" data-mode="avg3" onclick="setLapMode('avg3')">Avg 3</button>
+        <button class="lap-mode-btn" data-mode="avg5" onclick="setLapMode('avg5')">Avg 5</button>
+      </div>
+    </div>
+    <!-- Header -->
+    <div class="standings-head st-cols" id="standings-head">
+      <div class="col-h">Pos</div>
+      <div class="col-h col-c">Cat</div>
+      <div class="col-h">Driver</div>
+      <div class="col-h col-r">S1</div>
+      <div class="col-h col-r">S2</div>
+      <div class="col-h col-r">S3</div>
+      <div class="col-h col-r" id="hd-last">Last</div>
+      <div class="col-h col-r" id="hd-col7">±</div>
+      <div class="col-h col-r" id="hd-col8">Gap</div>
+      <div class="col-h col-r" id="hd-col9">Int</div>
+      <div class="col-h col-r">VE</div>
+      <div class="col-h col-r">VE/L</div>
+      <div class="col-h col-c">Sts</div>
+    </div>
+    <!-- Scrollable body -->
+    <div class="standings-scroll" style="overflow-y:auto;flex:1;position:relative">
+      <div id="standings-body"><div class="connecting"><div class="spinner"></div>Waiting for data...</div></div>
+    </div>
+    <!-- Player sticky footer -->
+    <div class="player-sticky" id="player-sticky">
+      <div class="standing-row st-cols" id="player-sticky-row"></div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="sdot" id="ws-dot"></div>
+    <span id="ws-status">Connecting...</span>
+    <span style="margin-left:auto;font-size:9px">
+      Data: <a href="https://github.com/s-victor/TinyPedal" target="_blank" style="color:var(--muted)">TinyPedal · S.Victor</a>
+      &nbsp;·&nbsp; Pitwall v2 · CERT Racing
+    </span>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+
+const lineupId   = localStorage.getItem('pw_active_lineup') || ''
+const lineupName = localStorage.getItem('pw_active_lineup_name') || (lineupId ? 'Lineup' : 'Local')
+
+renderHeader('lineup', 'pitwall-livetiming')
+if (_checkPopoutOverlay('pitwall-livetiming')) throw ''
+
+// ── CATEGORY SYSTEM ──
+const CAT_ORDER  = ['hyper','lmp2','lmp3','gte','gt3','other']
+const CAT_LABELS = { hyper:'HY', lmp2:'LMP2', lmp3:'LMP3', gte:'GTE', gt3:'GT3', other:'Other' }
+const CAT_COLORS = { hyper:'#e11d48', lmp2:'#3b8fff', lmp3:'#a855f7', gte:'#22c55e', gt3:'#ff8c00', other:'#666' }
+
+function catKey(vc) {
+  const c = (vc || '').toLowerCase()
+  if (c.includes('hyper') || c === 'hy') return 'hyper'
+  if (c.includes('lmp3'))  return 'lmp3'
+  if (c.includes('lmp2'))  return 'lmp2'   // covers "LMP2", "LMP2 ELMS", etc.
+  if (c.includes('gte'))   return 'gte'
+  if (c.includes('gt3'))   return 'gt3'
+  return 'other'
+}
+
+// ── STATE ──
+let _lapMode = 'last'
+let _tyreTempMode = 'surface' // 'surface' or 'core'
+function toggleTyreTemp() {
+  _tyreTempMode = _tyreTempMode === 'surface' ? 'core' : 'surface'
+  const el = document.getElementById('tyre-temp-toggle')
+  if (el) el.textContent = _tyreTempMode.toUpperCase()
+}
+const _lapHistory  = new Map()  // id → [lapTime, ...]
+const _lastKnown   = new Map()  // id → totalLaps
+const _veHistory   = new Map()  // id → [consumption, ...]  (VE% consumed per lap)
+const _vePrev      = new Map()  // id → { laps, ve }
+const _catFilters  = new Set()
+let _allCategories = []
+let _lastStandings = []
+let _playerCompound = ''
+let _p1BestLap = -1
+
+// ── SOCKET + Notification Engine ──
+const _notifier = new PitNotifier()
+const _handlers = {
+  onStatus(s)     { setDot(s === 'connected') },
+  onPublisher(on) { setLiveDot(on) },
+  onSession(d)    { updateSession(d); _notifier.update(d, null, null) },
+  onDriver(d)     { updateDriver(d);  _notifier.update(null, d, null) },
+  onStandings(d)  { updateStandings(d); _notifier.update(null, null, d) },
+}
+
+let socket = null;
+let currentSocketType = null;
+
+async function checkAndSwitchSocket() {
+  let hasLocalData = false;
+  let isDriving = false;
+  
+  // 1. On vérifie l'état du jeu local
+  try {
+    const r = await fetch('http://localhost:5000/api/cache', { cache: 'no-store', signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      const cache = await r.json();
+      hasLocalData = Object.keys(cache.fast || {}).length > 0;
+      isDriving = cache.slow && cache.slow.is_driving === true;
+    }
+  } catch {}
+
+  // 2. Règle de bascule :
+  // - Si le jeu local tourne ET que le joueur conduit -> Mode LOCAL
+  // - Sinon, si une lineup est définie -> Mode VPS (pour voir les coéquipiers)
+  // - Sinon (solo hors piste) -> Mode LOCAL (pour au moins avoir l'UI connectée)
+  let targetType = (hasLocalData && isDriving) ? 'local' : (lineupId ? 'vps' : 'local');
+
+  // 3. Exécution de la bascule si nécessaire
+  if (targetType !== currentSocketType) {
+    console.info(`[Pitwall] Bascule du socket : ${currentSocketType || 'aucun'} -> ${targetType}`);
+    if (socket) {
+      socket.close(); // Ferme proprement l'ancienne connexion
+    }
+    currentSocketType = targetType;
+    
+    if (targetType === 'local') {
+      socket = new LocalSocket(_handlers);
+    } else {
+      socket = new PitwallSocket(lineupId, _handlers);
+    }
+    socket.connect();
+  }
+}
+// Lancement immédiat, puis vérification toutes les 3 secondes
+checkAndSwitchSocket();
+setInterval(checkAndSwitchSocket, 3000);
+
+function setDot(ok) {
+  document.getElementById('ws-dot').className = 'sdot' + (ok ? ' ok' : ' err')
+  document.getElementById('ws-status').textContent = ok ? `Connected — ${lineupName}` : 'Reconnecting...'
+}
+
+// ── LAP MODE ──
+function setLapMode(mode) {
+  _lapMode = mode
+  document.querySelectorAll('.lap-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode))
+  if (_lastStandings.length) updateStandings(_lastStandings)
+}
+
+// ── CATEGORY FILTER ──
+function buildCatButtons(categories) {
+  const container = document.getElementById('cat-btns')
+  if (!container) return
+  const sorted = [...categories].sort((a,b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b))
+  container.innerHTML = sorted.map(k => {
+    const active = _catFilters.size === 0 || _catFilters.has(k)
+    const col = CAT_COLORS[k] || '#666'
+    return `<button class="cat-btn${active?' active':''}" data-cat="${k}"
+      onclick="toggleCat('${k}')"
+      style="${active ? `color:${col};border-color:${col};background:${col}18` : ''}"
+    >${CAT_LABELS[k]||k}</button>`
+  }).join('')
+}
+
+function toggleCat(k) {
+  if (_catFilters.size === 0) {
+    _allCategories.forEach(c => _catFilters.add(c))
+    _catFilters.delete(k)
+  } else if (_catFilters.has(k)) {
+    _catFilters.delete(k)
+  } else {
+    _catFilters.add(k)
+  }
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    const ck = b.dataset.cat
+    const show = _catFilters.size === 0 || _catFilters.has(ck)
+    const col = CAT_COLORS[ck] || '#666'
+    b.classList.toggle('active', show)
+    b.style.color       = show ? col : ''
+    b.style.borderColor = show ? col : ''
+    b.style.background  = show ? col + '18' : ''
+  })
+  if (_lastStandings.length) updateStandings(_lastStandings)
+}
+
+// ── SESSION ──
+const GRIP_LABELS = ['Green', 'Low Rubber', 'Medium', 'Heavy', 'Saturated']
+// session_type: 0=testday, 1-4=practice, 5-8=qualifying, 9=warmup, 10-13=race
+const SESSION_LABELS = {0:'Test Day',1:'Practice 1',2:'Practice 2',3:'Practice 3',4:'Practice 4',
+  5:'Qualifying 1',6:'Qualifying 2',7:'Qualifying 3',8:'Qualifying 4',
+  9:'Warm Up',10:'Race',11:'Race 2',12:'Race 3',13:'Race 4'}
+let _sessionMode = '' // 'quali' or 'race'
+
+function updateSession(s) {
+  if (!s || !Object.keys(s).length) return
+
+  // Track name + logo
+  const trackName = s.track || s.track_name || ''
+  setText('s-track', trackName || '—')
+  if (trackName) {
+    document.getElementById('s-track-logo').src = Assets.circuitLogo(trackName)
+  }
+
+  // Session type detection
+  const st = s.session_type
+  if (st != null) {
+    setText('s-session', SESSION_LABELS[st] || '—')
+    const newMode = (st >= 5 && st <= 8) ? 'quali' : (st >= 10) ? 'race' : ''
+    if (newMode !== _sessionMode) {
+      _sessionMode = newMode
+      // Update header labels
+      if (newMode === 'quali') {
+        setText('hd-last', 'Last')
+        setText('hd-col7', 'Best')
+        setText('hd-col8', 'Gap P1')
+        setText('hd-col9', '')
+      } else {
+        setText('hd-last', 'Last')
+        setText('hd-col7', '±')
+        setText('hd-col8', 'Gap')
+        setText('hd-col9', 'Int')
+      }
+      // Re-render standings for new mode
+      if (_lastStandings.length) updateStandings(_lastStandings)
+    }
+  }
+
+  setText('s-time',  s.time_remaining != null ? fmtTime(s.time_remaining) : '—')
+  setText('s-lap',   s.lap_number != null ? `Lap ${s.lap_number}` : '—')
+  setText('s-ttemp', s.track_temp != null ? `${s.track_temp}°C` : '—')
+  setText('s-atemp', s.air_temp   != null ? `${s.air_temp}°C`   : '—')
+  setText('s-rain',  s.is_raining ? `${Math.round((s.rain_intensity||0)*100)}%` : 'Dry')
+  setText('s-cars',  s.num_vehicles != null ? `${s.num_vehicles}` : '—')
+
+  // Grip
+  const grip = s.track_grip ?? s.track_grip_level
+  setText('s-grip', grip != null ? (GRIP_LABELS[grip] || `${grip}`) : '—')
+
+  // Flags — proper colored flag indicators
+  updateFlag(s)
+
+  const comp = s.tyre_compound_fl || s.tyre_compound || s.tyre_name_front || ''
+  if (comp) {
+    _playerCompound = comp
+    document.getElementById('d-compound').textContent = `— ${comp}`
+  }
+}
+
+function updateFlag(s) {
+  const el = document.getElementById('s-flag')
+  const flagState   = s.flag_state     // per-vehicle: 0=green, 6=blue
+  const yellowState = s.yellow_flag    // session-wide yellow (-1=invalid, 0=none, 1+=active)
+  const gamePhase   = s.game_phase     // 5=green, 6=FCY/SC, 8=session over
+  const finishSt    = s.finish_status  // 0=none, 1=finished
+
+  // White flag = last lap (time remaining very low, under ~1 lap time)
+  const isLastLap = _sessionMode === 'race' && s.time_remaining != null && s.time_remaining > 0 && s.time_remaining < 180
+
+  // Priority: Checkered > Yellow/SC > Blue > White (last lap) > Green
+  if (finishSt === 1 || gamePhase === 8) {
+    el.innerHTML = '<span class="flag-icon f-checkered"></span> FINISH'
+    el.style.color = '#ccc'
+  } else if (yellowState > 0 || gamePhase === 6) {
+    el.innerHTML = '<span class="flag-icon f-yellow"></span> YELLOW'
+    el.style.color = '#facc15'
+  } else if (flagState === 6) {
+    el.innerHTML = '<span class="flag-icon f-blue"></span> BLUE'
+    el.style.color = '#3b8fff'
+  } else if (isLastLap) {
+    el.innerHTML = '<span class="flag-icon f-white"></span> LAST LAP'
+    el.style.color = '#e5e5e5'
+  } else if (flagState === 0 && s.num_vehicles > 0) {
+    el.innerHTML = '<span class="flag-icon f-green"></span> GREEN'
+    el.style.color = '#22c55e'
+  } else {
+    el.innerHTML = ''
+    el.style.color = ''
+  }
+}
+
+// ── DRIVER ──
+function updateDriver(d) {
+  if (!d || !Object.keys(d).length) return
+  const gear = d.gear === -1 ? 'R' : d.gear === 0 ? 'N' : String(d.gear)
+  setText('d-speed', d.speed_kmh ?? '—')
+  setText('d-gear',  gear)
+
+  const fuelL = d.fuel_liters
+  setText('d-fuel', fuelL != null ? Number(fuelL).toFixed(1) : '—')
+
+  const ve = d.virtual_energy
+  if (ve != null) {
+    const col = ve < 20 ? 'var(--red)' : ve < 40 ? 'var(--orange)' : 'var(--lime)'
+    setText('d-ve', Number(ve).toFixed(1))
+    document.getElementById('d-ve').style.color = col
+    const bar = document.getElementById('d-ve-bar')
+    bar.style.width = `${ve}%`
+    bar.style.background = col
+  }
+
+  // Tyres — handle flat keys (LocalSocket) and nested objects (PitwallSocket)
+  const tyreTemp = _tyreTempMode === 'core'
+    ? (d.tyre_core || { fl: d.tyre_core_fl, fr: d.tyre_core_fr, rl: d.tyre_core_rl, rr: d.tyre_core_rr })
+    : (d.tyre_temp || { fl: d.tyre_temp_fl, fr: d.tyre_temp_fr, rl: d.tyre_temp_rl, rr: d.tyre_temp_rr })
+  const tyreWear = d.tyre_wear || { fl: d.tyre_wear_fl, fr: d.tyre_wear_fr, rl: d.tyre_wear_rl, rr: d.tyre_wear_rr }
+
+  ;['fl','fr','rl','rr'].forEach(c => {
+    const t = tyreTemp[c], w = tyreWear[c]
+    setText(`tt-${c}`, t != null ? `${Math.round(t)}°` : '—°')
+    setText(`tw-${c}`, w != null ? `${Number(w).toFixed(1)}%` : '—%')
+    if (t != null) {
+      const col = t > 95 ? 'var(--red)' : t > 75 ? 'var(--lime)' : t > 50 ? 'var(--orange)' : 'var(--blue)'
+      document.getElementById(`tc-${c}`).style.borderLeftColor = col
+      document.getElementById(`tt-${c}`).style.color = col
+    }
+  })
+
+  const ahead  = d.gap_ahead  ?? d.gap_place_ahead
+  const behind = d.gap_behind ?? d.gap_place_behind
+  setText('d-ahead',  ahead  > 0 ? `+${Number(ahead).toFixed(2)}s`  : '—')
+  setText('d-behind', behind > 0 ? `+${Number(behind).toFixed(2)}s` : '—')
+
+  const indMap = [['i-abs',d.abs_active,'on-abs'],['i-tc',d.tc_active,'on-tc'],
+    ['i-pit',d.in_pits,'on-pit'],['i-lim',d.pit_limiter,'on-pit'],['i-inv',d.lap_invalidated,'on-inv']]
+  indMap.forEach(([id,on,cls]) => {
+    const el = document.getElementById(id)
+    if (el) el.className = 'ind' + (on ? ` ${cls}` : '')
+  })
+}
+
+// ── STANDINGS HELPERS ──
+function fmtSector(s) {
+  if (s == null || isNaN(s) || s <= 0) return '—'
+  const m = Math.floor(s / 60)
+  const sec = (s - m * 60)
+  return m > 0 ? `${m}:${sec.toFixed(3).padStart(6,'0')}` : sec.toFixed(3)
+}
+
+function getLapTime(car) {
+  if (_lapMode === 'last') return car.last_lap > 0 ? car.last_lap : -1
+  const hist = _lapHistory.get(car.id)
+  if (!hist || !hist.length) return car.last_lap > 0 ? car.last_lap : -1
+  const n = _lapMode === 'avg3' ? 3 : 5
+  const slice = hist.slice(-n)
+  return slice.length ? slice.reduce((a,b) => a+b, 0) / slice.length : -1
+}
+
+function getVeConsumption(car) {
+  const hist = _veHistory.get(car.id)
+  if (!hist || !hist.length) return -1
+  if (_lapMode === 'last') return hist[hist.length - 1]
+  const n = _lapMode === 'avg3' ? 3 : 5
+  const slice = hist.slice(-n)
+  return slice.length ? slice.reduce((a,b) => a+b, 0) / slice.length : -1
+}
+
+function trackLaps(list) {
+  list.forEach(car => {
+    if (car.last_lap <= 0) return
+    const prevLaps = _lastKnown.get(car.id)
+    if (prevLaps !== car.total_laps) {
+      // ── Track lap times ──
+      _lastKnown.set(car.id, car.total_laps)
+      if (!_lapHistory.has(car.id)) _lapHistory.set(car.id, [])
+      const h = _lapHistory.get(car.id)
+      if (h.length === 0 || h[h.length-1] !== car.last_lap) {
+        h.push(car.last_lap)
+        if (h.length > 10) h.shift()
+      }
+
+      // ── Track VE consumption ──
+      const prev = _vePrev.get(car.id)
+      const curVe = car.virtual_energy ?? car.fuel_fraction
+      if (prev != null && curVe != null) {
+        const consumed = prev - curVe
+        if (consumed > 0 && consumed < 50) { // sanity check (pit refuel would be negative)
+          if (!_veHistory.has(car.id)) _veHistory.set(car.id, [])
+          const vh = _veHistory.get(car.id)
+          vh.push(Math.round(consumed * 10) / 10)
+          if (vh.length > 10) vh.shift()
+        }
+      }
+      _vePrev.set(car.id, curVe)
+    } else if (!_vePrev.has(car.id) && (car.virtual_energy ?? car.fuel_fraction) != null) {
+      // First sighting — record baseline VE
+      _vePrev.set(car.id, car.virtual_energy ?? car.fuel_fraction)
+    }
+  })
+}
+
+function computeCatPositions(sorted) {
+  const counters = {}
+  sorted.forEach(car => {
+    const ck = catKey(car.vehicle_class)
+    counters[ck] = (counters[ck] || 0) + 1
+    car._catPos = counters[ck]
+    car._catKey = ck
+  })
+}
+
+function brandLogo(car) {
+  const ck = catKey(car.vehicle_class)
+  if (ck === 'lmp2' || ck === 'lmp3') return 'assets/cars/Brand=Oreca.svg'
+  return Assets.carLogo(car.vehicle)
+}
+
+function isVisible(car) {
+  if (_catFilters.size === 0) return true
+  return _catFilters.has(car._catKey || catKey(car.vehicle_class))
+}
+
+function veColor(pct) {
+  if (pct == null || isNaN(pct)) return 'var(--muted)'
+  if (pct < 15) return 'var(--red)'
+  if (pct < 30) return 'var(--orange)'
+  return 'var(--text)'
+}
+
+function buildRowHTML(car) {
+  const ck    = car._catKey || catKey(car.vehicle_class)
+  const ccol  = CAT_COLORS[ck] || '#666'
+  const logo  = brandLogo(car)
+  const vehicle = car.vehicle?.includes('#') ? '#' + car.vehicle.split('#')[1] : car.vehicle || ''
+
+  // Sectors
+  const s1 = fmtSector(car.last_s1)
+  const s2 = fmtSector(car.last_s2)
+  const s3 = fmtSector(car.last_s3)
+  const s1cls = car.last_s1 > 0 && car.best_s1 > 0 && car.last_s1 <= car.best_s1 ? ' pb' : ''
+  const s2cls = car.last_s2 > 0 && car.best_s2 > 0 && car.last_s2 <= car.best_s2 ? ' pb' : ''
+  const s3cls = car.last_s3 > 0 && car.best_s3 > 0 && car.last_s3 <= car.best_s3 ? ' pb' : ''
+
+  // Lap time
+  const lapVal = getLapTime(car)
+  const lapStr = lapVal > 0 ? fmtLap(lapVal) : '—'
+
+  // Delta — own column (race: last vs best, quali: not shown)
+  let deltaStr = ''
+  let deltaCls = ''
+  if (_sessionMode !== 'quali' && lapVal > 0 && car.best_lap > 0) {
+    const diff = lapVal - car.best_lap
+    if (Math.abs(diff) > 0.001) {
+      deltaStr = (diff > 0 ? '+' : '') + diff.toFixed(3)
+      deltaCls = diff <= 0 ? ' faster' : ' slower'
+    }
+  }
+
+  // Qualifying: best lap + gap to P1 best
+  const bestStr = car.best_lap > 0 ? fmtLap(car.best_lap) : '—'
+  const gapToP1Best = car.position === 1 ? '' :
+    (car.best_lap > 0 && _p1BestLap > 0 ? `+${(car.best_lap - _p1BestLap).toFixed(3)}` : '')
+
+  // Race: GAP & Interval — only show when laps have been completed
+  const hasLaps = car.total_laps > 0
+  const gap  = car.position === 1 || !hasLaps ? '' : (car.time_behind_leader > 0 ? `+${car.time_behind_leader.toFixed(3)}` : '')
+  const intv = car.position === 1 || !hasLaps ? '' : (car.time_behind_next > 0 ? `+${car.time_behind_next.toFixed(3)}` : '')
+
+  // VE level
+  const veVal = car.virtual_energy ?? car.fuel_fraction
+  const veStr = veVal != null ? `${Math.round(veVal)}%` : ''
+  const veCol = veColor(veVal)
+
+  // VE consumption per lap
+  const veCons = getVeConsumption(car)
+  const veConStr = veCons > 0 ? `${veCons.toFixed(1)}%` : ''
+
+  // Status
+  let statusHTML = ''
+  if (car.in_pits || car.pit_state >= 2) {
+    statusHTML = '<span class="badge-pit">PIT</span>'
+  } else if (car.under_yellow || car.flag === 6) {
+    statusHTML = car.flag === 6 ? '<span class="badge-yellow">BLUE</span>' : '<span class="badge-yellow">YEL</span>'
+  }
+
+  return `
+    <div class="col-pos">${car.position}</div>
+    <div class="col-cat" style="color:${ccol}">${car._catPos || ''}</div>
+    <div class="col-name-wrap">
+      <img src="${logo}" alt="" class="col-brand" onerror="this.style.display='none'">
+      <div style="min-width:0">
+        <div class="col-name-p">${esc(car.name||'—')}</div>
+        <div class="col-name-s">${esc(vehicle)}</div>
+      </div>
+    </div>
+    <div class="col-sector${s1cls}">${s1}</div>
+    <div class="col-sector${s2cls}">${s2}</div>
+    <div class="col-sector${s3cls}">${s3}</div>
+    <div class="col-lap">${lapStr}</div>
+    <div class="${_sessionMode === 'quali' ? 'col-lap' : 'col-delta' + deltaCls}">${_sessionMode === 'quali' ? bestStr : deltaStr}</div>
+    <div class="col-gap">${_sessionMode === 'quali' ? gapToP1Best : gap}</div>
+    <div class="col-gap">${_sessionMode === 'quali' ? '' : intv}</div>
+    <div class="col-ve" style="color:${veCol}">${veStr}</div>
+    <div class="col-vel">${veConStr}</div>
+    <div class="col-status">${statusHTML}</div>`
+}
+
+// ── UPDATE STANDINGS ──
+function updateStandings(list) {
+  if (!Array.isArray(list) || !list.length) return
+  _lastStandings = list
+
+  const sorted = [...list].sort((a,b) => a.position - b.position)
+  trackLaps(sorted)
+  computeCatPositions(sorted)
+
+  // P1 best lap for qualifying gap calculation
+  const p1 = sorted.find(c => c.position === 1)
+  _p1BestLap = (p1 && p1.best_lap > 0) ? p1.best_lap : -1
+
+  const cats = [...new Set(sorted.map(c => c._catKey))].sort((a,b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b))
+  if (cats.join() !== _allCategories.join()) {
+    _allCategories = cats
+    buildCatButtons(cats)
+  }
+
+  const body = document.getElementById('standings-body')
+
+  sorted.forEach((car, i) => {
+    const rowId = `row-${car.id}`
+    let row = document.getElementById(rowId)
+    const hidden = !isVisible(car)
+    const ck   = car._catKey
+    const ccol = CAT_COLORS[ck] || '#666'
+    const rowCls = `standing-row st-cols${car.is_player?' player':''}${car.in_pits?' in-pits':''}${hidden?' filtered-out':''}`
+
+    if (!row) { row = document.createElement('div'); row.id = rowId; body.appendChild(row) }
+    row.className = rowCls
+    row.style.borderLeftColor = ccol
+    row.innerHTML = buildRowHTML(car)
+
+    if (body.children[i]?.id !== rowId) body.insertBefore(row, body.children[i] || null)
+  })
+  while (body.children.length > sorted.length) body.removeChild(body.lastChild)
+
+  const player = sorted.find(c => c.is_player)
+  if (player) {
+    setText('d-pos',  player.position)
+    setText('d-name', player.name || '—')
+    setText('d-car',  (player.vehicle||'').split(':')[0])
+    updatePlayerSticky(player)
+  }
+}
+
+// ── PLAYER STICKY ──
+function updatePlayerSticky(player) {
+  const stickyWrap = document.getElementById('player-sticky')
+  const stickyRow  = document.getElementById('player-sticky-row')
+  const realRow    = document.getElementById(`row-${player.id}`)
+
+  if (!realRow || !stickyWrap) return
+
+  const scroll = document.querySelector('.standings-scroll')
+  const scrollRect = scroll.getBoundingClientRect()
+  const rowRect    = realRow.getBoundingClientRect()
+
+  const isInView   = rowRect.top >= scrollRect.top - 2 && rowRect.bottom <= scrollRect.bottom + 2
+  const isFiltered = realRow.classList.contains('filtered-out')
+
+  if (isInView && !isFiltered) {
+    stickyWrap.classList.remove('visible')
+  } else {
+    const ccol = CAT_COLORS[player._catKey] || '#666'
+    stickyRow.style.borderLeftColor = ccol
+    stickyRow.innerHTML = buildRowHTML(player)
+    stickyWrap.classList.add('visible')
+  }
+}
+
+document.querySelector('.standings-scroll')?.addEventListener('scroll', () => {
+  const player = _lastStandings.find(c => c.is_player)
+  if (player) updatePlayerSticky(player)
+})
+</script>
+</body>
+</html>

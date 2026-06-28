@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stint Setup — Pitwall</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="notification-engine.js"></script>
+<script src="pitwall.js"></script>
+<script src="stint-engine.js"></script>
+<style>
+.sp-subnav { display:flex; gap:2px; padding:0 20px; background:var(--surface); border-bottom:1px solid var(--border); }
+.sp-subnav a { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
+.sp-subnav a:hover { color:var(--text); }
+.sp-subnav a.active { color:var(--lime); border-bottom-color:var(--lime); }
+
+.setup-page { max-width:960px; margin:0 auto; padding:24px 20px; }
+.setup-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.setup-section { margin-bottom:24px; }
+
+.form-group { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.form-label { font-size:9px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+input[type=number],input[type=text],select { background:var(--surface); border:1px solid var(--border); border-radius:2px; color:var(--text); font-family:'Barlow Condensed',sans-serif; font-size:14px; padding:8px 10px; width:100%; outline:none; box-sizing:border-box; }
+input:focus,select:focus { border-color:var(--lime); }
+
+.mode-toggle { display:flex; gap:0; border:1px solid var(--border); border-radius:2px; overflow:hidden; }
+.mode-btn { flex:1; padding:8px 16px; text-align:center; cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); background:transparent; border:none; transition:all .15s; }
+.mode-btn.active { background:var(--lime); color:var(--black); }
+
+.cat-toggle { display:flex; gap:0; border:1px solid var(--border); border-radius:2px; overflow:hidden; margin-bottom:12px; }
+.cat-btn { flex:1; padding:6px 8px; text-align:center; cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:transparent; border:none; border-right:1px solid var(--border); transition:all .15s; }
+.cat-btn:last-child { border-right:none; }
+.cat-btn.active { background:var(--lime); color:var(--black); }
+
+/* PIT ESTIMATE */
+.pit-estimate { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:12px 14px; margin-top:8px; font-family:'Barlow Condensed',sans-serif; }
+.pit-est-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+.pit-est-label { color:var(--muted); font-weight:600; }
+.pit-est-val { font-weight:700; }
+.pit-est-total { font-size:14px; font-weight:900; color:var(--lime); border-top:1px solid var(--border); padding-top:6px; margin-top:4px; }
+
+/* L&C */
+.lc-info { font-size:11px; color:var(--muted); margin-top:4px; font-family:'Barlow Condensed',sans-serif; }
+.lc-info strong { color:var(--text); }
+
+/* TYRE CONFIG */
+.tyre-config-card { border:1px solid var(--border); border-radius:4px; padding:14px; margin-bottom:10px; background:var(--card); }
+.tyre-config-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.tyre-config-name { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700; }
+.tyre-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.tyre-corner-box { border:1px solid var(--border); border-radius:2px; padding:8px; text-align:center; }
+.tyre-corner-label { font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--muted); margin-bottom:6px; }
+.tyre-corner-select { width:100%; }
+.tyre-extras { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.tyre-extras .form-label { font-size:8px; }
+
+/* TYRE ALLOC */
+.tyre-alloc { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:10px 14px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; font-family:'Barlow Condensed',sans-serif; }
+.tyre-alloc-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.tyre-alloc-val { font-size:16px; font-weight:900; }
+
+/* TEMP BAR */
+.temp-bar { display:flex; height:28px; border-radius:2px; overflow:hidden; border:1px solid var(--border); margin-top:4px; }
+.temp-seg { flex:1; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; font-family:'Barlow Condensed',sans-serif; }
+
+/* WEATHER */
+.weather-section-header { display:flex; align-items:center; gap:6px; }
+.weather-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; border:1px solid var(--muted); font-size:10px; font-weight:900; color:var(--muted); cursor:help; position:relative; }
+.weather-help:hover .weather-tooltip { display:block; }
+.weather-tooltip { display:none; position:absolute; bottom:22px; left:50%; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); border-radius:4px; padding:10px 12px; width:260px; font-size:10px; font-weight:400; color:var(--text); line-height:1.4; z-index:20; box-shadow:0 4px 12px rgba(0,0,0,.5); }
+.weather-bar { display:flex; gap:4px; margin-top:6px; }
+.weather-slot { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 4px; border:1px solid var(--border); border-radius:2px; cursor:pointer; transition:all .15s; font-family:'Barlow Condensed',sans-serif; }
+.weather-slot:hover { border-color:var(--muted); }
+.weather-slot .ws-emoji { font-size:18px; }
+.weather-slot .ws-pct { font-size:10px; font-weight:700; color:var(--muted); }
+.weather-slot .ws-time { font-size:8px; color:var(--muted); }
+.weather-slot.active { border-color:var(--lime); background:rgba(200,255,0,.05); }
+
+/* DRIVER */
+.driver-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:2px; margin-bottom:6px; background:var(--surface); cursor:pointer; transition:border-color .15s; }
+.driver-row:hover { border-color:var(--muted); }
+.driver-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.driver-name { flex:1; font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:600; }
+.driver-meta { font-size:11px; color:var(--muted); font-family:'Barlow Condensed',sans-serif; }
+.driver-remove { cursor:pointer; color:var(--muted); font-size:14px; padding:2px 4px; transition:color .15s; }
+.driver-remove:hover { color:var(--red); }
+
+.scenario-bar { display:flex; gap:4px; margin-bottom:20px; align-items:center; }
+.scenario-tab { padding:6px 14px; border:1px solid var(--border); border-radius:2px; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; color:var(--muted); background:transparent; transition:all .15s; }
+.scenario-tab.active { border-color:var(--lime); color:var(--lime); background:rgba(200,255,0,.05); }
+
+.setup-actions { display:flex; gap:10px; margin-top:20px; }
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div id="app-header"></div>
+<div class="sp-subnav">
+  <a href="stint-setup.html" class="active">Setup</a>
+  <a href="stint-summary.html">Summary</a>
+  <a href="stint-plan.html">Plan</a>
+  <a href="stint-tyres.html">Tyres</a>
+</div>
+
+<div class="setup-page">
+  <div class="scenario-bar" id="scenario-bar"></div>
+
+  <div class="setup-grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <!-- CATEGORY -->
+      <div class="setup-section">
+        <div class="section-label">Vehicle Category</div>
+        <div class="cat-toggle" id="cat-toggle"></div>
+        <div class="form-row" id="cat-extras" style="display:none">
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer">
+              <input type="checkbox" id="p-le-mans" checked onchange="onCategoryChange()" style="accent-color:var(--lime)"> Le Mans (75L)
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- RACE PARAMS -->
+      <div class="setup-section">
+        <div class="section-label">Race Parameters</div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Duration (h)</div><input type="number" id="p-hours" value="6" min="0" max="24" onchange="onRaceParamChange()"></div>
+          <div class="form-group"><div class="form-label">Minutes</div><input type="number" id="p-minutes" value="0" min="0" max="59" onchange="onRaceParamChange()"></div>
+        </div>
+        <div class="form-group"><div class="form-label">Base lap time (m:ss.xxx)</div><input type="text" id="p-laptime" value="1:42.000" placeholder="1:42.000"></div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Max stint (h)</div><input type="number" id="p-max-stint" value="2" step="0.5"></div>
+          <div class="form-group"><div class="form-label">Sim time multiplier</div><input type="number" id="p-sim-mult" value="1" step="0.5" min="0.5" onchange="onRaceParamChange()"></div>
+        </div>
+        <div class="form-group"><div class="form-label">In-sim start hour</div><input type="number" id="p-sim-start" value="14" min="0" max="23" onchange="onRaceParamChange()"></div>
+      </div>
+
+      <!-- ENERGY MODE -->
+      <div class="setup-section">
+        <div class="section-label">Energy Mode</div>
+        <div class="mode-toggle" id="energy-mode">
+          <button class="mode-btn active" data-mode="fuel" onclick="setEnergyMode('fuel')">Fuel</button>
+          <button class="mode-btn" data-mode="ve" onclick="setEnergyMode('ve')">VE (Virtual Energy)</button>
+        </div>
+        <div id="fuel-fields" style="margin-top:12px">
+          <div class="form-row">
+            <div class="form-group"><div class="form-label">Tank size (L)</div><input type="number" id="p-tank" value="75" min="10" onchange="updatePitEstimate()"></div>
+            <div class="form-group"><div class="form-label">Fuel per lap (L)</div><input type="number" id="p-fuel-lap" value="3.2" step="0.1" onchange="onLCChange();updatePitEstimate()"></div>
+          </div>
+        </div>
+        <div id="ve-fields" style="margin-top:12px;display:none">
+          <div class="form-row">
+            <div class="form-group"><div class="form-label">Virtual Energy Tank (%)</div><input type="number" id="p-ve-capacity" value="100" min="1" max="100"></div>
+            <div class="form-group"><div class="form-label">Per lap (%)</div><input type="number" id="p-ve-per-lap" value="4" step="0.1" onchange="onLCChange()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIFT & COAST -->
+      <div class="setup-section">
+        <div class="section-label">Lift &amp; Coast</div>
+        <div class="form-group">
+          <div class="form-label">L&amp;C Intensity: <strong id="lc-val">0%</strong></div>
+          <input type="range" id="p-lc" min="0" max="100" step="5" value="0" oninput="onLCChange()" style="accent-color:var(--lime);width:100%">
+        </div>
+        <div class="lc-info" id="lc-info">No Lift &amp; Coast — flat out driving</div>
+      </div>
+
+      <!-- PIT STOP ESTIMATE -->
+      <div class="setup-section">
+        <div class="section-label">Pit Stop Estimate (LMU)</div>
+        <div class="pit-estimate" id="pit-estimate"></div>
+      </div>
+
+      <!-- TRACK TEMP -->
+      <div class="setup-section">
+        <div class="section-label">Track Temperature</div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">Mode</div>
+            <select id="p-temp-mode" onchange="onTempModeChange()">
+              <option value="auto">Auto (24h curve)</option>
+              <option value="manual">Manual (fixed)</option>
+            </select>
+          </div>
+          <div class="form-group" id="manual-temp-group" style="display:none">
+            <div class="form-label">Track temp (C)</div>
+            <input type="number" id="p-temp-manual" value="25" step="1" onchange="renderTempPreview()">
+          </div>
+        </div>
+        <div class="form-row" id="auto-temp-extras">
+          <div class="form-group">
+            <div class="form-label">Start track temp (C)</div>
+            <input type="number" id="p-temp-start" value="40" step="1" onchange="renderTempPreview()">
+          </div>
+        </div>
+        <div id="temp-preview" class="temp-bar"></div>
+      </div>
+
+      <!-- WEATHER FORECAST -->
+      <div class="setup-section">
+        <div class="weather-section-header">
+          <div class="section-label" style="margin-bottom:0">Weather Forecast</div>
+          <div class="weather-help">?
+            <div class="weather-tooltip">
+              <strong>LMU Weather System</strong><br>
+              Each time slot has a rain probability (0-100%).<br>
+              Click an emoji to cycle through:<br>
+              &#9728;&#65039; 0% — Clear<br>
+              &#127780; 25% — Mostly sunny<br>
+              &#9925; 50% — May rain<br>
+              &#127782; 75% — Likely rain<br>
+              &#127783; 100% — Heavy rain<br><br>
+              Rain lowers track temperature (-8 to -15C) and triggers wet tyre recommendations.
+            </div>
+          </div>
+        </div>
+        <div class="weather-bar" id="weather-bar"></div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px"><span>Start</span><span>End</span></div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <!-- TYRE CONFIGS -->
+      <div class="setup-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="section-label" style="margin-bottom:0">Tyre Configurations</div>
+          <button class="btn-ghost" style="padding:5px 12px;font-size:11px" onclick="addTyreConfig()">+ Add config</button>
+        </div>
+        <div id="tyre-configs-list"></div>
+        <div class="form-group" style="margin-top:8px">
+          <div class="form-label">Tyre wear threshold (pit below %)</div>
+          <input type="number" id="p-tyre-threshold" value="25" min="5" max="50" step="5">
+        </div>
+        <div class="tyre-alloc" id="tyre-alloc">
+          <div><div class="tyre-alloc-label">Tyre Allocation</div><div style="font-size:10px;color:var(--muted)">Total tyres per weekend</div></div>
+          <input type="number" id="p-tyre-alloc" min="4" max="999" step="1" style="width:80px;text-align:center;font-size:16px;font-weight:900;font-family:'Barlow Condensed',sans-serif">
+        </div>
+      </div>
+
+      <!-- DRIVERS -->
+      <div class="setup-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="section-label" style="margin-bottom:0">Drivers</div>
+          <button class="btn-ghost" style="padding:5px 12px;font-size:11px" onclick="addManualDriver()">+ Add driver</button>
+        </div>
+        <div id="driver-list"></div>
+        <div id="driver-empty" style="font-size:11px;color:var(--muted);text-align:center;padding:20px">Loading drivers...</div>
+        <div id="driver-editor" style="display:none;margin-top:12px">
+          <div class="section-label" id="editor-title">Driver Settings</div>
+          <div class="form-group"><div class="form-label">Avg lap time (m:ss.xxx)</div><input type="text" id="de-laptime" placeholder="Use race default"></div>
+          <div class="form-group"><div class="form-label">Fuel per lap (L)</div><input type="number" id="de-fuel" step="0.1" placeholder="Use race default"></div>
+          <div class="section-label" style="margin-top:10px">Availability</div>
+          <div id="de-avail"></div>
+          <button class="btn-ghost" style="padding:4px 10px;font-size:10px;margin-top:6px" onclick="addAvailWindow()">+ Add window</button>
+          <button class="btn-ghost" style="padding:5px 12px;font-size:11px;margin-top:8px" onclick="saveDriverEdit()">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-actions">
+    <button class="btn-primary" style="flex:1" onclick="runCalculate()">Calculate Strategy</button>
+    <button class="btn-ghost" onclick="doSave()">Save</button>
+    <button class="btn-ghost" onclick="doLoad()">Load</button>
+  </div>
+  <div id="save-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px"></div>
+</div>
+
+<!-- PROMPT MODAL -->
+<div id="modal-prompt" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);align-items:center;justify-content:center;z-index:60" onclick="if(event.target===this)cancelPrompt()">
+  <div class="card" style="width:360px;padding:18px">
+    <div class="section-label" id="prompt-title">Enter value</div>
+    <input type="text" id="prompt-input" style="margin-top:8px" onkeydown="if(event.key==='Enter')confirmPrompt()">
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+      <button class="btn-ghost" style="padding:6px 14px;font-size:11px" onclick="cancelPrompt()">Cancel</button>
+      <button class="btn-primary" style="padding:6px 14px;font-size:11px" onclick="confirmPrompt()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOAD MODAL -->
+<div id="modal-load" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);align-items:center;justify-content:center;z-index:50" onclick="if(event.target===this)this.style.display='none'">
+  <div class="card" style="width:400px;max-height:60vh;overflow-y:auto;padding:18px">
+    <div class="section-label">Saved Strategies</div>
+    <div id="load-list" style="margin-top:10px"></div>
+    <button class="btn-ghost" style="margin-top:10px;width:100%" onclick="document.getElementById('modal-load').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+injectSharedCSS()
+if (!Auth.requireAuth()) throw new Error('not auth')
+const lineupId = localStorage.getItem('pw_active_lineup') || ''
+renderHeader(lineupId ? 'lineup' : 'local', 'stint-plan')
+if (_checkPopoutOverlay('stint-plan')) throw ''
+
+// === STATE ===
+let scenarios = ['default']
+let activeScenario = 'default'
+let energyMode = 'fuel'
+let selectedCategory = 'lmp2'
+// Weather: array of 5 slots, each with a pct (0,25,50,75,100)
+const WEATHER_SLOT_COUNT = 5
+let weatherSlots = new Array(WEATHER_SLOT_COUNT).fill(0)  // default all 0%
+let _drivers = []
+let _lineupMembers = []   // all lineup members (drivers+managers, not spectators)
+let editingDriverIdx = -1
+let tyreConfigs = [{
+  name: 'Config 1',
+  compounds: { fl: 'medium', fr: 'medium', rl: 'medium', rr: 'medium' },
+  temp_delta_min: null, temp_delta_max: null,
+  custom_deg: false, custom_deg_values: { fl: 1.2, fr: 1.2, rl: 1.2, rr: 1.2 },
+}]
+
+// === PROMPT ===
+let _promptResolve = null
+function showPrompt(title, defaultVal) {
+  return new Promise(resolve => {
+    _promptResolve = resolve
+    document.getElementById('prompt-title').textContent = title
+    const inp = document.getElementById('prompt-input')
+    inp.value = defaultVal || ''
+    document.getElementById('modal-prompt').style.display = 'flex'
+    setTimeout(() => inp.focus(), 50)
+  })
+}
+function confirmPrompt() {
+  const val = document.getElementById('prompt-input').value.trim()
+  document.getElementById('modal-prompt').style.display = 'none'
+  if (_promptResolve) { _promptResolve(val || null); _promptResolve = null }
+}
+function cancelPrompt() {
+  document.getElementById('modal-prompt').style.display = 'none'
+  if (_promptResolve) { _promptResolve(null); _promptResolve = null }
+}
+
+// === SCENARIOS ===
+function renderScenarioBar() {
+  document.getElementById('scenario-bar').innerHTML = scenarios.map(s =>
+    `<div class="scenario-tab ${s === activeScenario ? 'active' : ''}" onclick="switchScenario('${esc(s)}')">${esc(s)}</div>`
+  ).join('') + `<div class="scenario-tab" style="font-size:16px" onclick="addScenario()">+</div>`
+}
+function switchScenario(id) { activeScenario = id; renderScenarioBar() }
+async function addScenario() {
+  const name = await showPrompt('Scenario name:', `Strategy ${String.fromCharCode(65 + scenarios.length)}`)
+  if (!name) return
+  scenarios.push(name); activeScenario = name; renderScenarioBar()
+  saveToSession()
+}
+
+// === CATEGORY ===
+function renderCategoryBar() {
+  const el = document.getElementById('cat-toggle')
+  el.innerHTML = Object.entries(CATEGORIES).map(([k, v]) =>
+    `<button class="cat-btn ${k === selectedCategory ? 'active' : ''}" onclick="setCategory('${k}')">${v.short}</button>`
+  ).join('')
+}
+function setCategory(cat) {
+  selectedCategory = cat
+  const c = CATEGORIES[cat]
+  renderCategoryBar()
+  // Auto-set tank size
+  if (cat === 'lmp2') {
+    const isLM = document.getElementById('p-le-mans').checked
+    document.getElementById('p-tank').value = isLM ? 75 : 63
+    document.getElementById('cat-extras').style.display = ''
+  } else {
+    document.getElementById('p-tank').value = c.fuel
+    document.getElementById('cat-extras').style.display = 'none'
+  }
+  // Auto VE for HY and GT3
+  if (c.hasVE) {
+    setEnergyMode('ve')
+  } else {
+    setEnergyMode('fuel')
+  }
+  updateTyreAlloc()
+  updatePitEstimate()
+}
+function onCategoryChange() {
+  if (selectedCategory === 'lmp2') {
+    const isLM = document.getElementById('p-le-mans').checked
+    document.getElementById('p-tank').value = isLM ? 75 : 63
+  }
+  updatePitEstimate()
+}
+
+// === ENERGY MODE ===
+function setEnergyMode(mode) {
+  energyMode = mode
+  document.querySelectorAll('#energy-mode .mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode))
+  document.getElementById('fuel-fields').style.display = mode === 'fuel' ? '' : 'none'
+  document.getElementById('ve-fields').style.display = mode === 've' ? '' : 'none'
+  onLCChange()
+  updatePitEstimate()
+}
+
+// === RACE PARAM CHANGE (auto-update temp & weather) ===
+function onRaceParamChange() {
+  renderTempPreview()
+  renderWeatherBar()
+}
+
+// === LIFT & COAST ===
+function onLCChange() {
+  const val = parseInt(document.getElementById('p-lc').value) || 0
+  document.getElementById('lc-val').textContent = val + '%'
+  if (val === 0) {
+    document.getElementById('lc-info').innerHTML = 'No Lift &amp; Coast — flat out driving'
+    updatePitEstimate()
+    return
+  }
+  if (energyMode === 've') {
+    // VE mode: show % savings
+    const vePL = parseFloat(document.getElementById('p-ve-per-lap').value) || 4
+    const lc = lcCalc(vePL, val)
+    document.getElementById('lc-info').innerHTML =
+      `<strong>${lc.adjusted}%/lap</strong> (saves ${lc.saved}%/lap) — <strong>+${lc.penalty}s/lap</strong> time cost`
+  } else {
+    // Fuel mode: show L savings
+    const fpl = parseFloat(document.getElementById('p-fuel-lap').value) || 3.2
+    const lc = lcCalc(fpl, val)
+    document.getElementById('lc-info').innerHTML =
+      `<strong>${lc.adjusted} L/lap</strong> (saves ${lc.saved} L/lap) — <strong>+${lc.penalty}s/lap</strong> time cost`
+  }
+  updatePitEstimate()
+}
+
+// === PIT STOP ESTIMATE ===
+function updatePitEstimate() {
+  const tank = parseFloat(document.getElementById('p-tank').value) || 75
+  const fpl = parseFloat(document.getElementById('p-fuel-lap').value) || 3.2
+  const lcPct = parseInt(document.getElementById('p-lc').value) || 0
+  const lc = lcCalc(fpl, lcPct)
+  const lapsPerTank = Math.floor(tank / Math.max(0.01, lc.adjusted))
+  const fuelNeeded = lapsPerTank * lc.adjusted
+
+  const tFuel = fuelNeeded > 0 ? PIT_FUEL_BASE_S + fuelNeeded * PIT_FUEL_PER_LITRE_S : 0
+  const tTyres4 = PIT_TYRES_4_S
+  const tTyres2same = PIT_TYRES_2_SAME_S
+  const tTyres2cross = PIT_TYRES_2_CROSS_S
+  const total4 = Math.max(tFuel, tTyres4)
+  const total2same = Math.max(tFuel, tTyres2same)
+  const total2cross = Math.max(tFuel, tTyres2cross)
+  const free2same = tFuel >= tTyres2same
+  const free2cross = tFuel >= tTyres2cross
+
+  const el = document.getElementById('pit-estimate')
+  el.innerHTML = `
+    <div class="pit-est-row"><span class="pit-est-label">Fuel refill (~${Math.round(fuelNeeded)}L)</span><span class="pit-est-val">${tFuel.toFixed(1)}s</span></div>
+    <div class="pit-est-row"><span class="pit-est-label">4 tyres</span><span class="pit-est-val">${tTyres4}s</span></div>
+    <div class="pit-est-row"><span class="pit-est-label">2 tyres (same axle)</span><span class="pit-est-val">${tTyres2same}s ${free2same ? '<span style="color:var(--lime);font-size:10px">FREE</span>' : ''}</span></div>
+    <div class="pit-est-row"><span class="pit-est-label">2 tyres (cross axle)</span><span class="pit-est-val">${tTyres2cross}s ${free2cross ? '<span style="color:var(--lime);font-size:10px">FREE</span>' : ''}</span></div>
+    <div class="pit-est-row"><span class="pit-est-label">1 tyre</span><span class="pit-est-val">${PIT_TYRES_1_S}s</span></div>
+    <div class="pit-est-row pit-est-total"><span>Total (4T + fuel)</span><span>${total4.toFixed(1)}s</span></div>
+    <div style="font-size:9px;color:var(--muted);margin-top:6px">T = max(7.7 + Vol*0.53, T_tyres) | +15s driver swap</div>
+  `
+}
+
+// === TYRE ALLOC ===
+function updateTyreAlloc() {
+  const cat = CATEGORIES[selectedCategory]
+  const total = cat ? cat.tyres : 999
+  const el = document.getElementById('p-tyre-alloc')
+  el.value = total
+}
+
+// === TYRE CONFIGS ===
+function renderTyreConfigs() {
+  const el = document.getElementById('tyre-configs-list')
+  el.innerHTML = tyreConfigs.map((cfg, ci) => {
+    const cpds = cfg.compounds
+    const hasDelta = cfg.temp_delta_min !== null && cfg.temp_delta_max !== null
+    const isDeg = cfg.custom_deg
+    return `<div class="tyre-config-card">
+      <div class="tyre-config-header">
+        <div class="tyre-config-name">${esc(cfg.name)}</div>
+        ${tyreConfigs.length > 1 ? `<div class="driver-remove" onclick="removeTyreConfig(${ci})">&#10005;</div>` : ''}
+      </div>
+      <div class="tyre-grid">
+        ${CORNERS.map(c => `
+          <div class="tyre-corner-box">
+            <div class="tyre-corner-label">${CORNER_LABELS[c]}</div>
+            <select class="tyre-corner-select" onchange="updateTyreConfig(${ci},'${c}',this.value)">
+              ${Object.entries(CPDS).map(([k, v]) =>
+                `<option value="${k}" ${cpds[c] === k ? 'selected' : ''}>${v.label}</option>`
+              ).join('')}
+            </select>
+            ${isDeg ? `<input type="number" value="${cfg.custom_deg_values[c]}" step="0.1" min="0" max="10" style="margin-top:4px;font-size:11px;padding:4px" onchange="updateCustomDeg(${ci},'${c}',this.value)" placeholder="%/lap">` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="tyre-extras">
+        <div class="form-group">
+          <div class="form-label">Temp range min (C)</div>
+          <input type="number" value="${hasDelta ? cfg.temp_delta_min : ''}" step="1" placeholder="Any" onchange="updateTempDelta(${ci},'min',this.value)">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Temp range max (C)</div>
+          <input type="number" value="${hasDelta ? cfg.temp_delta_max : ''}" step="1" placeholder="Any" onchange="updateTempDelta(${ci},'max',this.value)">
+        </div>
+      </div>
+      <div style="margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer">
+          <input type="checkbox" ${isDeg ? 'checked' : ''} onchange="toggleCustomDeg(${ci},this.checked)" style="accent-color:var(--lime)"> Custom tyre degradation
+        </label>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function updateTyreConfig(cfgIdx, corner, compound) {
+  tyreConfigs[cfgIdx].compounds[corner] = compound
+}
+function updateTempDelta(cfgIdx, field, val) {
+  const v = val === '' ? null : parseFloat(val)
+  if (field === 'min') tyreConfigs[cfgIdx].temp_delta_min = v
+  else tyreConfigs[cfgIdx].temp_delta_max = v
+}
+function toggleCustomDeg(cfgIdx, checked) {
+  tyreConfigs[cfgIdx].custom_deg = checked
+  renderTyreConfigs()
+}
+function updateCustomDeg(cfgIdx, corner, val) {
+  tyreConfigs[cfgIdx].custom_deg_values[corner] = parseFloat(val) || 1.2
+}
+
+function addTyreConfig() {
+  tyreConfigs.push({
+    name: `Config ${tyreConfigs.length + 1}`,
+    compounds: { fl: 'medium', fr: 'medium', rl: 'medium', rr: 'medium' },
+    temp_delta_min: null, temp_delta_max: null,
+    custom_deg: false, custom_deg_values: { fl: 1.2, fr: 1.2, rl: 1.2, rr: 1.2 },
+  })
+  renderTyreConfigs()
+}
+
+function removeTyreConfig(idx) {
+  if (tyreConfigs.length <= 1) return
+  tyreConfigs.splice(idx, 1)
+  renderTyreConfigs()
+}
+
+// === TEMP ===
+function onTempModeChange() {
+  const mode = document.getElementById('p-temp-mode').value
+  document.getElementById('manual-temp-group').style.display = mode === 'manual' ? '' : 'none'
+  document.getElementById('auto-temp-extras').style.display = mode === 'auto' ? '' : 'none'
+  renderTempPreview()
+}
+
+function renderTempPreview() {
+  const bar = document.getElementById('temp-preview')
+  const mode = document.getElementById('p-temp-mode').value
+  const dur = readRaceDuration()
+  if (dur <= 0) { bar.innerHTML = ''; return }
+  const startH = parseFloat(document.getElementById('p-sim-start').value) || 14
+  const mult = parseFloat(document.getElementById('p-sim-mult').value) || 1
+  const customStart = parseFloat(document.getElementById('p-temp-start').value) || 40
+  const segs = 12
+  bar.innerHTML = ''
+
+  // Compute default temp at start hour for offset
+  const defaultAtStart = 27.5 + 12.5 * Math.sin(Math.PI * ((startH % 24) - 8) / 12)
+  const offset = customStart - defaultAtStart
+
+  for (let i = 0; i < segs; i++) {
+    const t = (i / segs) * dur
+    const simH = startH + (t / 3600) * mult
+    let temp
+    if (mode === 'manual') {
+      temp = parseFloat(document.getElementById('p-temp-manual').value) || 25
+    } else {
+      temp = 27.5 + 12.5 * Math.sin(Math.PI * ((simH % 24) - 8) / 12) + offset
+    }
+    // Check if rain at this time (lowers temp)
+    const slotIdx = Math.floor((t / dur) * WEATHER_SLOT_COUNT)
+    const rainPct = weatherSlots[Math.min(slotIdx, WEATHER_SLOT_COUNT - 1)] || 0
+    if (rainPct >= 75) temp -= 15
+    else if (rainPct >= 50) temp -= 8
+    else if (rainPct >= 25) temp -= 3
+    temp = Math.max(5, temp)
+
+    const pct = Math.max(0, Math.min(100, (temp - 5) / 45 * 100))
+    const r = Math.round(255 * pct / 100)
+    const b = Math.round(255 * (1 - pct / 100))
+    const seg = document.createElement('div')
+    seg.className = 'temp-seg'
+    seg.style.background = `rgb(${r},${Math.round(60 + pct * 0.5)},${b})`
+    seg.style.color = pct > 50 ? '#000' : '#fff'
+    seg.textContent = `${Math.round(temp)}\u00B0`
+    bar.appendChild(seg)
+  }
+}
+
+// === WEATHER (LMU 5-slot system) ===
+function renderWeatherBar() {
+  const bar = document.getElementById('weather-bar')
+  const dur = readRaceDuration()
+  bar.innerHTML = ''
+  for (let i = 0; i < WEATHER_SLOT_COUNT; i++) {
+    const pct = weatherSlots[i]
+    const slot = WEATHER_SLOTS.find(s => s.pct === pct) || WEATHER_SLOTS[0]
+    const tStart = (i / WEATHER_SLOT_COUNT) * dur
+    const tEnd = ((i + 1) / WEATHER_SLOT_COUNT) * dur
+    const startH = parseFloat(document.getElementById('p-sim-start').value) || 14
+    const mult = parseFloat(document.getElementById('p-sim-mult').value) || 1
+    const h1 = startH + (tStart / 3600) * mult
+    const h2 = startH + (tEnd / 3600) * mult
+    const fmt = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`
+
+    const isActive = pct > 0
+    const div = document.createElement('div')
+    div.className = `weather-slot ${isActive ? 'active' : ''}`
+    div.dataset.idx = i
+    div.onclick = () => cycleWeatherSlot(i)
+    div.innerHTML = `
+      <span class="ws-emoji">${slot.emoji}</span>
+      <span class="ws-pct">${slot.label}</span>
+      <span class="ws-time">${fmt(h1)}-${fmt(h2)}</span>
+    `
+    bar.appendChild(div)
+  }
+}
+function cycleWeatherSlot(idx) {
+  const current = weatherSlots[idx]
+  const levels = [0, 25, 50, 75, 100]
+  const nextIdx = (levels.indexOf(current) + 1) % levels.length
+  weatherSlots[idx] = levels[nextIdx]
+  renderWeatherBar()
+  renderTempPreview() // rain affects temp
+}
+function slotsToWeatherWindows() {
+  // Convert 5-slot system to weather_windows array for backend
+  const dur = readRaceDuration()
+  const windows = []
+  for (let i = 0; i < WEATHER_SLOT_COUNT; i++) {
+    const pct = weatherSlots[i]
+    if (pct >= 50) {
+      const from_s = (i / WEATHER_SLOT_COUNT) * dur
+      const to_s = ((i + 1) / WEATHER_SLOT_COUNT) * dur
+      windows.push({
+        from_s, to_s,
+        condition: pct >= 75 ? 'heavy_rain' : 'light_rain',
+        rain_pct: pct,
+      })
+    }
+  }
+  return windows
+}
+function readRaceDuration() {
+  return (parseFloat(document.getElementById('p-hours').value) || 0) * 3600 +
+         (parseFloat(document.getElementById('p-minutes').value) || 0) * 60
+}
+
+// === DRIVERS ===
+async function loadLineupDrivers() {
+  if (!lineupId) { renderDriverList(); return }
+  try {
+    // Try API first
+    const res = await fetch(`${API}/api/lineups/${lineupId}/members?token=${Auth.getToken()}`)
+    if (!res.ok) throw new Error()
+    const data = await res.json()
+    // Handle both formats: raw array [...] or { members: [...] }
+    let members = Array.isArray(data) ? data : (data.members || [])
+
+    // If API returned empty, build from team members + cached roles
+    if (!members.length) {
+      const rolesCache = JSON.parse(sessionStorage.getItem('pw_roles_cache') || '{}')
+      const cached = rolesCache[lineupId] || []
+      if (cached.length) {
+        // Fetch team members from event API
+        const eventId = new URLSearchParams(location.search).get('event_id')
+          || localStorage.getItem('pw_active_event') || ''
+        let teamMembers = []
+        if (eventId) {
+          try {
+            const evRes = await fetch(`${API}/api/events/${eventId}?token=${Auth.getToken()}`)
+            if (evRes.ok) {
+              const evData = await evRes.json()
+              teamMembers = evData.members || []
+            }
+          } catch {}
+        }
+        const roleMap = Object.fromEntries(cached.map(a => [a.member_id, a.role]))
+        members = teamMembers
+          .filter(m => roleMap[m.id] && roleMap[m.id] !== 'spectator')
+          .map(m => ({ ...m, lineup_role: roleMap[m.id] }))
+      }
+    }
+
+    const eligible = members.filter(m => {
+      const role = m.lineup_role || m.role || null
+      return role !== 'spectator'
+    })
+    _lineupMembers = eligible.map(m => ({
+      id: m.id, name: m.steam_name || m.name || 'Driver',
+    }))
+    _drivers = eligible.map((m, i) => ({
+      id: m.id, name: m.steam_name || m.name || `Driver ${i+1}`,
+      color: DRIVER_COLORS[i % DRIVER_COLORS.length],
+      avg_lap_s: null, fuel_per_lap_l: null,
+      availability: [{ from_s: 0, to_s: 86400 }],
+    }))
+    renderDriverList()
+  } catch { renderDriverList() }
+}
+
+function renderDriverList() {
+  const list = document.getElementById('driver-list')
+  const empty = document.getElementById('driver-empty')
+  if (!_drivers.length) { list.innerHTML = ''; empty.style.display = ''; empty.textContent = 'Add drivers manually or load from lineup'; return }
+  empty.style.display = 'none'
+  list.innerHTML = _drivers.map((d, i) => `
+    <div class="driver-row" onclick="editDriver(${i})">
+      <div class="driver-dot" style="background:${d.color}"></div>
+      <div class="driver-name">${esc(d.name)}</div>
+      <div class="driver-meta">${d.avg_lap_s ? fmtLapTime(d.avg_lap_s) : 'Default'}</div>
+      <div class="driver-remove" onclick="event.stopPropagation();_drivers.splice(${i},1);editingDriverIdx=-1;document.getElementById('driver-editor').style.display='none';renderDriverList()">&#10005;</div>
+    </div>`).join('')
+}
+
+async function addManualDriver() {
+  // If we have lineup members, show a picker with available (not yet added) drivers
+  const addedIds = new Set(_drivers.map(d => d.id))
+  const available = _lineupMembers.filter(m => !addedIds.has(m.id))
+
+  if (available.length > 0) {
+    showDriverPicker(available)
+    return
+  }
+  // Fallback: manual entry if no lineup or all members already added
+  const name = await showPrompt('Driver name:', '')
+  if (!name) return
+  _drivers.push({
+    id: 'manual_' + Date.now(), name,
+    color: DRIVER_COLORS[_drivers.length % DRIVER_COLORS.length],
+    avg_lap_s: null, fuel_per_lap_l: null,
+    availability: [{ from_s: 0, to_s: 86400 }],
+  })
+  renderDriverList()
+}
+
+function showDriverPicker(available) {
+  const overlay = document.createElement('div')
+  overlay.className = 'modal-overlay'
+  overlay.style.display = 'flex'
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove() }
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:360px">
+      <div class="modal-title">Add Driver from Lineup</div>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">
+        ${available.map(m => `
+          <button class="btn-ghost" style="text-align:left;padding:10px 14px;font-size:14px;font-weight:600"
+                  onclick="pickLineupDriver('${esc(m.id)}','${esc(m.name)}');this.closest('.modal-overlay').remove()">
+            ${esc(m.name)}
+          </button>`).join('')}
+      </div>
+      <div class="modal-actions" style="margin-top:14px">
+        <button class="btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn-ghost" onclick="this.closest('.modal-overlay').remove();addManualDriverFallback()">Manual entry</button>
+      </div>
+    </div>`
+  document.body.appendChild(overlay)
+}
+
+function pickLineupDriver(id, name) {
+  _drivers.push({
+    id, name,
+    color: DRIVER_COLORS[_drivers.length % DRIVER_COLORS.length],
+    avg_lap_s: null, fuel_per_lap_l: null,
+    availability: [{ from_s: 0, to_s: 86400 }],
+  })
+  renderDriverList()
+}
+
+async function addManualDriverFallback() {
+  const name = await showPrompt('Driver name:', '')
+  if (!name) return
+  _drivers.push({
+    id: 'manual_' + Date.now(), name,
+    color: DRIVER_COLORS[_drivers.length % DRIVER_COLORS.length],
+    avg_lap_s: null, fuel_per_lap_l: null,
+    availability: [{ from_s: 0, to_s: 86400 }],
+  })
+  renderDriverList()
+}
+
+function editDriver(idx) {
+  const ed = document.getElementById('driver-editor')
+  if (editingDriverIdx === idx) {
+    editingDriverIdx = -1
+    ed.style.display = 'none'
+    return
+  }
+  editingDriverIdx = idx
+  const d = _drivers[idx]
+  ed.style.display = ''
+  document.getElementById('editor-title').innerHTML = `<span style="color:${d.color}">${esc(d.name)}</span>`
+  document.getElementById('de-laptime').value = d.avg_lap_s ? fmtLapTime(d.avg_lap_s) : ''
+  document.getElementById('de-fuel').value = d.fuel_per_lap_l || ''
+  renderAvailWindows(d)
+}
+
+function renderAvailWindows(d) {
+  document.getElementById('de-avail').innerHTML = d.availability.map((a, i) => `
+    <div class="form-row" style="margin-bottom:6px">
+      <div class="form-group"><div class="form-label">From</div><input type="text" value="${fmtHMS(a.from_s)}" data-avail="${i}" data-field="from"></div>
+      <div class="form-group"><div class="form-label">To</div><input type="text" value="${fmtHMS(a.to_s)}" data-avail="${i}" data-field="to"></div>
+    </div>`).join('')
+}
+function fmtHMS(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60)
+  return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+}
+function parseHMS(str) {
+  const m = str.match(/^(\d+):(\d{2}):(\d{2})$/)
+  if (!m) return null
+  return parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3])
+}
+function addAvailWindow() {
+  if (editingDriverIdx < 0) return
+  const d = _drivers[editingDriverIdx]
+  const last = d.availability.at(-1)
+  d.availability.push({ from_s: last ? last.to_s : 0, to_s: (last ? last.to_s : 0) + 3600 })
+  renderAvailWindows(d)
+}
+function saveDriverEdit() {
+  if (editingDriverIdx < 0) return
+  const d = _drivers[editingDriverIdx]
+  d.avg_lap_s = parseLapTime(document.getElementById('de-laptime').value) || null
+  const fuel = parseFloat(document.getElementById('de-fuel').value)
+  d.fuel_per_lap_l = fuel > 0 ? fuel : null
+  document.querySelectorAll('#de-avail input').forEach(inp => {
+    const ai = parseInt(inp.dataset.avail), field = inp.dataset.field
+    const t = parseHMS(inp.value)
+    if (t !== null && d.availability[ai]) d.availability[ai][field === 'from' ? 'from_s' : 'to_s'] = t
+  })
+  renderDriverList()
+  document.getElementById('driver-editor').style.display = 'none'
+  editingDriverIdx = -1
+}
+
+// === READ PARAMS ===
+function readParams() {
+  return {
+    race_duration_s: readRaceDuration(),
+    base_lap_time_s: parseLapTime(document.getElementById('p-laptime').value) || 102,
+    category: selectedCategory,
+    is_le_mans: selectedCategory === 'lmp2' ? document.getElementById('p-le-mans').checked : true,
+    energy_mode: energyMode,
+    tank_size_l: parseFloat(document.getElementById('p-tank').value) || 75,
+    fuel_per_lap_l: parseFloat(document.getElementById('p-fuel-lap').value) || 3.2,
+    ve_capacity_pct: parseFloat(document.getElementById('p-ve-capacity').value) || 100,
+    ve_per_lap_pct: parseFloat(document.getElementById('p-ve-per-lap').value) || 4,
+    lift_coast_pct: parseInt(document.getElementById('p-lc').value) || 0,
+    max_stint_s: (parseFloat(document.getElementById('p-max-stint').value) || 2) * 3600,
+    sim_start_hour: parseFloat(document.getElementById('p-sim-start').value) || 14,
+    sim_time_mult: parseFloat(document.getElementById('p-sim-mult').value) || 1,
+    default_compound: 'medium',
+    tyre_wear_threshold_pct: parseFloat(document.getElementById('p-tyre-threshold').value) || 25,
+    track_temp_mode: document.getElementById('p-temp-mode').value,
+    track_temp_manual_c: parseFloat(document.getElementById('p-temp-manual').value) || 25,
+    track_temp_start_c: parseFloat(document.getElementById('p-temp-start').value) || 40,
+    tyre_allocation: parseInt(document.getElementById('p-tyre-alloc').value) || 999,
+  }
+}
+function readDrivers() {
+  return _drivers.map(d => ({
+    id: d.id, name: d.name, color: d.color,
+    avg_lap_s: d.avg_lap_s || null,
+    fuel_per_lap_l: d.fuel_per_lap_l || null,
+    availability: d.availability || [{ from_s: 0, to_s: 86400 }],
+  }))
+}
+
+// === SAVE TO SESSION ===
+function saveToSession() {
+  sessionStorage.setItem('sp_scenario', activeScenario)
+  sessionStorage.setItem('sp_params', JSON.stringify(readParams()))
+  sessionStorage.setItem('sp_drivers', JSON.stringify(readDrivers()))
+  sessionStorage.setItem('sp_weather', JSON.stringify(slotsToWeatherWindows()))
+  sessionStorage.setItem('sp_tyre_configs', JSON.stringify(tyreConfigs))
+}
+
+// === CALCULATE ===
+async function runCalculate() {
+  saveToSession()
+  try {
+    await StintPlanAPI.calculate(activeScenario, readParams(), readDrivers(), slotsToWeatherWindows(), tyreConfigs)
+    location.href = 'stint-plan.html'
+  } catch (err) {
+    alert('Backend not reachable. Start the backend first.\n' + err.message)
+  }
+}
+
+// === SAVE / LOAD ===
+async function doSave() {
+  try {
+    saveToSession()
+    await StintPlanAPI.calculate(activeScenario, readParams(), readDrivers(), slotsToWeatherWindows(), tyreConfigs)
+    await StintPlanAPI.save(activeScenario, activeScenario)
+    const el = document.getElementById('save-status')
+    el.textContent = '\u2713 Saved'; el.style.color = 'var(--lime)'
+    setTimeout(() => { el.textContent = '' }, 2000)
+  } catch (e) { console.error(e) }
+}
+async function doLoad() {
+  try {
+    const { plans } = await StintPlanAPI.listSaved()
+    const list = document.getElementById('load-list')
+    if (!plans.length) { list.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center">No saved plans</div>' }
+    else {
+      list.innerHTML = plans.map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${esc(p.name)}</div>
+          <div style="display:flex;gap:4px">
+            <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="loadPlan('${esc(p.id)}')">Load</button>
+            <button class="btn-ghost" style="padding:4px 10px;font-size:10px;color:var(--red);border-color:var(--red)" onclick="deletePlan('${esc(p.id)}')">&#10005;</button>
+          </div>
+        </div>`).join('')
+    }
+    document.getElementById('modal-load').style.display = 'flex'
+  } catch (e) { console.error(e) }
+}
+async function loadPlan(id) {
+  try {
+    const { data } = await StintPlanAPI.load(id)
+    if (data && data.params) {
+      const p = data.params
+      document.getElementById('p-hours').value = Math.floor(p.race_duration_s / 3600)
+      document.getElementById('p-minutes').value = Math.floor((p.race_duration_s % 3600) / 60)
+      document.getElementById('p-laptime').value = fmtLapTime(p.base_lap_time_s)
+      document.getElementById('p-max-stint').value = p.max_stint_s / 3600
+      document.getElementById('p-sim-start').value = p.sim_start_hour
+      document.getElementById('p-sim-mult').value = p.sim_time_mult
+      document.getElementById('p-tank').value = p.tank_size_l || 75
+      document.getElementById('p-fuel-lap').value = p.fuel_per_lap_l || 3.2
+      document.getElementById('p-ve-capacity').value = p.ve_capacity_pct || 100
+      document.getElementById('p-ve-per-lap').value = p.ve_per_lap_pct || 4
+      document.getElementById('p-tyre-threshold').value = p.tyre_wear_threshold_pct || 25
+      document.getElementById('p-temp-mode').value = p.track_temp_mode || 'auto'
+      document.getElementById('p-temp-manual').value = p.track_temp_manual_c || 25
+      document.getElementById('p-temp-start').value = p.track_temp_start_c || 40
+      document.getElementById('p-lc').value = p.lift_coast_pct || 0
+      if (p.category) { selectedCategory = p.category; renderCategoryBar() }
+      if (p.is_le_mans !== undefined) document.getElementById('p-le-mans').checked = p.is_le_mans
+      if (p.energy_mode) setEnergyMode(p.energy_mode)
+      onTempModeChange()
+      onLCChange()
+      updatePitEstimate()
+      activeScenario = id
+      if (!scenarios.includes(id)) scenarios.push(id)
+      renderScenarioBar()
+    }
+    if (data && data.drivers) {
+      _drivers = data.drivers.map((d, i) => ({
+        id: d.id, name: d.name, color: d.color || DRIVER_COLORS[i % DRIVER_COLORS.length],
+        avg_lap_s: d.avg_lap_s, fuel_per_lap_l: d.fuel_per_lap_l,
+        availability: d.availability || [{ from_s: 0, to_s: 86400 }],
+      }))
+      renderDriverList()
+    }
+    if (data && data.tyre_configs) {
+      tyreConfigs = data.tyre_configs
+      renderTyreConfigs()
+    }
+    document.getElementById('modal-load').style.display = 'none'
+  } catch (e) { console.error(e) }
+}
+async function deletePlan(id) { await StintPlanAPI.deleteSaved(id); doLoad() }
+
+// === INIT ===
+renderScenarioBar()
+renderCategoryBar()
+renderTyreConfigs()
+renderWeatherBar()
+onTempModeChange()
+updatePitEstimate()
+updateTyreAlloc()
+onLCChange()
+loadLineupDrivers()
+</script>
+</body>
+</html>

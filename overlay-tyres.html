@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tyres & Brakes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lime:#C8FF00; --blue:#3BA7FF; --green:#1DB954; --amber:#FFB020; --red:#FF4444;
+  --bg:rgba(7,7,7,0.93); --bg2:rgba(255,255,255,0.05); --muted:#5a5a5a; --muted2:#888;
+  --border:#181818; --border2:#252525;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;width:100%;background:transparent;overflow:hidden;
+  font-family:'Barlow Condensed',sans-serif;user-select:none;color:#e8e8e8;}
+
+.widget{
+  position:absolute;inset:0;background:var(--bg);
+  backdrop-filter:blur(10px) saturate(1.8);
+  border-left:3px solid var(--lime);border-top:1px solid rgba(200,255,0,0.1);
+  border-radius:0 5px 5px 0;
+  box-shadow:0 8px 28px rgba(0,0,0,0.75),inset 1px 0 0 rgba(200,255,0,0.05);
+  padding:9px 11px;display:flex;flex-direction:column;gap:6px;
+  outline:2px dashed transparent;outline-offset:-4px;overflow:hidden;
+}
+.widget::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:100;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:5px;border-bottom:1px solid var(--border2);flex-shrink:0;}
+.title{font-size:9px;font-weight:900;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);}
+.hdr-right{display:flex;align-items:center;gap:6px;}
+.compound{font-size:10px;font-weight:900;letter-spacing:0.08em;color:#000;
+  background:var(--lime);padding:2px 6px;border-radius:2px;line-height:1;}
+.compound.wet{background:var(--blue);color:#fff;}
+.dot{width:5px;height:5px;border-radius:50%;background:#2a2a2a;transition:background 0.2s,box-shadow 0.2s;}
+.dot.live{background:var(--lime);box-shadow:0 0 7px rgba(200,255,0,0.8);}
+
+/* Car grid */
+.car-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;position:relative;}
+.car-grid::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--border2);transform:translateX(-50%);}
+
+.tyre-block{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:4px;
+  padding:5px 7px;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:3px;
+}
+.tyre-block.flat{border-color:rgba(255,68,68,0.6);animation:flat-pulse 0.8s ease-in-out infinite;}
+@keyframes flat-pulse{50%{border-color:var(--red);box-shadow:0 0 8px rgba(255,68,68,0.3);}}
+
+/* Wear fill bg */
+.wear-bg{position:absolute;bottom:0;left:0;right:0;z-index:0;transition:height 0.3s,background 0.3s;}
+
+/* Temps row */
+.temps-row{z-index:1;display:flex;align-items:flex-end;justify-content:space-between;}
+.t-main{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;}
+.t-unit{font-size:9px;color:var(--muted);margin-left:1px;}
+.t-press{font-size:11px;font-weight:700;color:var(--muted2);font-variant-numeric:tabular-nums;}
+
+/* 3-zone temp bars */
+.zone-bars{z-index:1;display:flex;gap:2px;height:4px;}
+.zone-bar{flex:1;border-radius:1px;transition:background 0.2s;}
+
+/* Secondary data */
+.tyre-meta{z-index:1;display:flex;justify-content:space-between;align-items:center;
+  font-size:9px;color:var(--muted);font-weight:700;padding-top:3px;border-top:1px solid rgba(255,255,255,0.05);}
+.meta-val{font-weight:900;color:var(--muted2);}
+.meta-warn{color:var(--red);font-weight:900;}
+
+/* Brake temp */
+.brake-row{z-index:1;display:flex;align-items:center;gap:4px;}
+.brake-lbl{font-size:8px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.1em;}
+.brake-bar{flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden;}
+.brake-fill{height:100%;background:var(--red);transition:width 0.1s;}
+.brake-val{font-size:9px;font-weight:900;color:var(--muted2);font-variant-numeric:tabular-nums;min-width:28px;text-align:right;}
+
+/* Position labels */
+.pos-labels{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
+.pos-lbl{font-size:8px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:0 1px;}
+.pos-lbl:last-child{text-align:right;}
+
+body.edit .widget{outline-color:var(--lime);-webkit-app-region:drag;cursor:move;}
+body.not-driving:not(.edit):not(.force-show) .widget{opacity:0;pointer-events:none;transition:opacity 0.3s;}
+body.driving .widget, body.force-show .widget, body.edit .widget{opacity:1;transition:opacity 0.2s;}
+</style>
+  <script src="pitwall.js"></script>
+  <script src="sidebar.js"></script>
+</head>
+<body>
+<div class="widget">
+  <div class="hdr">
+    <div class="title">Tyres &amp; Brakes</div>
+    <div class="hdr-right">
+      <span class="compound" id="compound">DRY</span>
+      <div class="dot" id="dot"></div>
+    </div>
+  </div>
+
+  <div class="pos-labels">
+    <div class="pos-lbl">Front Left</div>
+    <div class="pos-lbl">Front Right</div>
+  </div>
+
+  <div class="car-grid">
+    <!-- FL -->
+    <div class="tyre-block" id="blk-FL">
+      <div class="wear-bg" id="wbg-FL"></div>
+      <div class="temps-row">
+        <div class="t-main" id="t-FL">—<span class="t-unit">°</span></div>
+        <div class="t-press" id="p-FL">—<span style="font-size:8px;color:var(--muted)"> kPa</span></div>
+      </div>
+      <div class="zone-bars"><div class="zone-bar" id="zi-FL"></div><div class="zone-bar" id="zc-FL"></div><div class="zone-bar" id="zo-FL"></div></div>
+      <div class="tyre-meta">
+        <span>WEAR</span><span class="meta-val" id="wr-FL">—%</span>
+        <span>GRIP</span><span class="meta-val" id="gf-FL">—%</span>
+      </div>
+      <div class="brake-row">
+        <span class="brake-lbl">BRK</span>
+        <div class="brake-bar"><div class="brake-fill" id="bb-FL"></div></div>
+        <span class="brake-val" id="bt-FL">—°</span>
+      </div>
+    </div>
+    <!-- FR -->
+    <div class="tyre-block" id="blk-FR">
+      <div class="wear-bg" id="wbg-FR"></div>
+      <div class="temps-row" style="flex-direction:row-reverse">
+        <div class="t-main" id="t-FR">—<span class="t-unit">°</span></div>
+        <div class="t-press" id="p-FR">—<span style="font-size:8px;color:var(--muted)"> kPa</span></div>
+      </div>
+      <div class="zone-bars"><div class="zone-bar" id="zi-FR"></div><div class="zone-bar" id="zc-FR"></div><div class="zone-bar" id="zo-FR"></div></div>
+      <div class="tyre-meta">
+        <span>WEAR</span><span class="meta-val" id="wr-FR">—%</span>
+        <span>GRIP</span><span class="meta-val" id="gf-FR">—%</span>
+      </div>
+      <div class="brake-row">
+        <span class="brake-lbl">BRK</span>
+        <div class="brake-bar"><div class="brake-fill" id="bb-FR"></div></div>
+        <span class="brake-val" id="bt-FR">—°</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pos-labels">
+    <div class="pos-lbl">Rear Left</div>
+    <div class="pos-lbl">Rear Right</div>
+  </div>
+
+  <div class="car-grid">
+    <!-- RL -->
+    <div class="tyre-block" id="blk-RL">
+      <div class="wear-bg" id="wbg-RL"></div>
+      <div class="temps-row">
+        <div class="t-main" id="t-RL">—<span class="t-unit">°</span></div>
+        <div class="t-press" id="p-RL">—<span style="font-size:8px;color:var(--muted)"> kPa</span></div>
+      </div>
+      <div class="zone-bars"><div class="zone-bar" id="zi-RL"></div><div class="zone-bar" id="zc-RL"></div><div class="zone-bar" id="zo-RL"></div></div>
+      <div class="tyre-meta">
+        <span>WEAR</span><span class="meta-val" id="wr-RL">—%</span>
+        <span>GRIP</span><span class="meta-val" id="gf-RL">—%</span>
+      </div>
+      <div class="brake-row">
+        <span class="brake-lbl">BRK</span>
+        <div class="brake-bar"><div class="brake-fill" id="bb-RL"></div></div>
+        <span class="brake-val" id="bt-RL">—°</span>
+      </div>
+    </div>
+    <!-- RR -->
+    <div class="tyre-block" id="blk-RR">
+      <div class="wear-bg" id="wbg-RR"></div>
+      <div class="temps-row" style="flex-direction:row-reverse">
+        <div class="t-main" id="t-RR">—<span class="t-unit">°</span></div>
+        <div class="t-press" id="p-RR">—<span style="font-size:8px;color:var(--muted)"> kPa</span></div>
+      </div>
+      <div class="zone-bars"><div class="zone-bar" id="zi-RR"></div><div class="zone-bar" id="zc-RR"></div><div class="zone-bar" id="zo-RR"></div></div>
+      <div class="tyre-meta">
+        <span>WEAR</span><span class="meta-val" id="wr-RR">—%</span>
+        <span>GRIP</span><span class="meta-val" id="gf-RR">—%</span>
+      </div>
+      <div class="brake-row">
+        <span class="brake-lbl">BRK</span>
+        <div class="brake-bar"><div class="brake-fill" id="bb-RR"></div></div>
+        <span class="brake-val" id="bt-RR">—°</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const POSITIONS = ['FL','FR','RL','RR'];
+const $ = id => document.getElementById(id);
+
+function tempClass(t, opt) {
+  if (t == null || isNaN(t)) return 'var(--muted)';
+  if (opt) {
+    const d = t - opt;
+    if (d < -15) return 'var(--blue)';
+    if (d <= 8)  return 'var(--green)';
+    if (d <= 18) return 'var(--amber)';
+    return 'var(--red)';
+  }
+  if (t < 70)  return 'var(--blue)';
+  if (t < 95)  return 'var(--green)';
+  if (t < 110) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function wearColor(pct) {
+  if (pct > 60) return 'rgba(200,255,0,0.12)';
+  if (pct > 30) return 'rgba(255,176,32,0.12)';
+  return 'rgba(255,68,68,0.2)';
+}
+
+function brakeColor(t) {
+  if (t == null) return 'var(--muted)';
+  if (t > 900) return 'var(--red)';
+  if (t > 600) return 'var(--amber)';
+  return 'var(--green)';
+}
+
+function renderTyre(pos, d) {
+  const suf = pos.toLowerCase();
+  const temp = d['tyre_temp_' + suf];
+  const wear = d['tyre_wear_' + suf];
+  const press = d['tyre_pressure_' + suf];
+  const brkT = d['brake_temp_' + suf];
+  const opt = d['tyre_optimal_' + suf];
+  const flat = d['tyre_flat_' + suf] || d['tyre_detached_' + suf];
+  const grip = d['grip_fract_' + suf];
+
+  // 3-zone temps (inner/center/outer)
+  const tI = d['tyre_inner_temp_' + suf];
+  const tC = d['tyre_center_temp_' + suf] ?? temp;
+  const tO = d['tyre_outer_temp_' + suf];
+
+  const tEl = $('t-' + pos);
+  tEl.innerHTML = (temp != null ? Math.round(temp) : '—') + '<span class="t-unit">°</span>';
+  tEl.style.color = tempClass(temp, opt);
+
+  // Pressure in kPa
+  const pEl = $('p-' + pos);
+  pEl.innerHTML = (press != null ? press.toFixed(0) : '—') + '<span style="font-size:8px;color:var(--muted)"> kPa</span>';
+
+  // Wear background
+  const wPct = wear != null ? Math.max(0, Math.min(100, wear)) : 0;
+  const wbg = $('wbg-' + pos);
+  wbg.style.height = wPct + '%';
+  wbg.style.background = wearColor(wPct);
+
+  // Wear + grip
+  const wrEl = $('wr-' + pos);
+  wrEl.textContent = wear != null ? Math.round(wear) + '%' : '—%';
+  wrEl.style.color = wPct > 60 ? 'var(--lime)' : (wPct > 30 ? 'var(--amber)' : 'var(--red)');
+  const gfEl = $('gf-' + pos);
+  const gripPct = grip != null ? (100 - (grip * 100)) : null;
+  gfEl.textContent = gripPct != null ? Math.round(gripPct) + '%' : '—%';
+
+  // 3-zone bars
+  const zones = [[tI,'zi-'],[tC,'zc-'],[tO,'zo-']];
+  for (const [t, pfx] of zones) {
+    const el = $(pfx + pos);
+    el.style.background = tempClass(t ?? temp, opt);
+    el.style.opacity = t != null ? '1' : '0.3';
+  }
+
+  // Brake
+  const btEl = $('bt-' + pos);
+  btEl.textContent = brkT != null ? Math.round(brkT) + '°' : '—°';
+  btEl.style.color = brakeColor(brkT);
+  const bFill = $('bb-' + pos);
+  const bPct = brkT != null ? Math.min(100, (brkT / 1100) * 100) : 0;
+  bFill.style.width = bPct + '%';
+  bFill.style.background = brakeColor(brkT);
+
+  // Flat warning
+  $('blk-' + pos).className = 'tyre-block' + (flat ? ' flat' : '');
+}
+
+function applyDriver(d) {
+  if (!d) return;
+  for (const pos of POSITIONS) renderTyre(pos, d);
+
+  // Compound
+  const cmp = d.tyre_compound_fl || d.tyre_compound_fr || d.tyre_compound_rl || d.tyre_compound_rr;
+  const cEl = $('compound');
+  if (cmp) {
+    const c = String(cmp).toUpperCase();
+    cEl.textContent = c;
+    cEl.className = 'compound' + (c.includes('WET') || c.includes('INTER') ? ' wet' : '');
+  } else {
+    cEl.textContent = 'DRY'; cEl.className = 'compound';
+  }
+}
+
+if (window.electronAPI?.overlays?.onEditMode)
+  window.electronAPI.overlays.onEditMode(e => document.body.classList.toggle('edit', !!e));
+if (window.electronAPI?.overlays?.onForceShow)
+  window.electronAPI.overlays.onForceShow(on => document.body.classList.toggle('force-show', !!on));
+
+document.body.classList.add('not-driving');
+
+let _lastDriverTs = 0;
+function applyDrivingGate(v) {
+  // Explicit flag from backend, if present
+  let driving;
+  if (v === 1 || v === true || v === '1') driving = true;
+  else if (v === 0 || v === false || v === '0') driving = false;
+  else driving = (Date.now() - _lastDriverTs) < 2000;
+  document.body.classList.toggle('driving', driving);
+  document.body.classList.toggle('not-driving', !driving);
+}
+setInterval(() => applyDrivingGate(), 500);
+
+const _isPreview = new URLSearchParams(location.search).get('preview') === '1';
+if (_isPreview) {
+  document.body.classList.add('force-show','driving');
+  applyDriver({
+    tyre_temp_fl:88, tyre_temp_fr:91, tyre_temp_rl:85, tyre_temp_rr:86,
+    tyre_wear_fl:72, tyre_wear_fr:68, tyre_wear_rl:78, tyre_wear_rr:75,
+    tyre_pressure_fl:175, tyre_pressure_fr:176, tyre_pressure_rl:182, tyre_pressure_rr:183,
+    brake_temp_fl:420, brake_temp_fr:380, brake_temp_rl:280, brake_temp_rr:290,
+    grip_fract_fl:0.04, grip_fract_fr:0.06, grip_fract_rl:0.03, grip_fract_rr:0.04,
+    tyre_inner_temp_fl:92, tyre_center_temp_fl:88, tyre_outer_temp_fl:84,
+    tyre_optimal_fl:90
+  });
+}
+
+$('dot').className = 'dot';
+let ws=null, rcT=null;
+function connect() {
+  try{ ws=new WebSocket((window.PITWALL && window.PITWALL.WS_URL) || 'ws://localhost:54345'); } catch(e){ sched(); return; }
+  ws.onopen = () => $('dot').className = 'dot live';
+  ws.onclose = () => { $('dot').className='dot'; sched(); };
+  ws.onerror = () => { try{ws.close();}catch(_){} };
+  ws.onmessage = (ev) => {
+    let msg; try{msg=JSON.parse(ev.data);}catch(_){return;}
+    if (!msg?.type) return;
+    if (msg.type==='snapshot' && msg.data) {
+      if (msg.data.driver && Object.keys(msg.data.driver).length) _lastDriverTs = Date.now();
+      applyDriver(msg.data.driver);
+      applyDrivingGate(msg.data.session?.is_driving);
+    } else if (msg.type==='update' && msg.topic==='driver') {
+      if (msg.data && Object.keys(msg.data).length) _lastDriverTs = Date.now();
+      applyDriver(msg.data);
+      applyDrivingGate();
+    } else if (msg.type==='update' && msg.topic==='session' && 'is_driving' in (msg.data||{})) {
+      applyDrivingGate(msg.data.is_driving);
+    }
+  };
+}
+function sched(){ if(!rcT) rcT=setTimeout(()=>{rcT=null;connect();},1500); }
+if(!_isPreview) connect();
+</script>
+</body>
+</html>
